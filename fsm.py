@@ -83,7 +83,8 @@ class BalloonPopper():
         # TODO: laser callback function (some of this might have to go in camera callback?)
         # deal with fsm states 
 
-        if not self._close_obstacle:
+        # robot will only be random walking when green flag and red flag are false 
+        if not self._close_obstacle and not self.green and not self.red:
             # angle increment of the scanner 
             angle_increment = msg.angle_increment
             # find the number of entries in the ranges array from the scan  message 
@@ -157,6 +158,9 @@ class BalloonPopper():
             # after which the flag is set again to False.
             # Use the function move already implemented, passing the default velocities saved in the corresponding class members.
             ####### TODO: ANSWER CODE BEGIN #######
+            if self.green or self.red: 
+                break
+
             if not self._close_obstacle:  
                 self.move(LINEAR_VELOCITY, 0)
 
@@ -203,6 +207,7 @@ class BalloonPopper():
                     self._fsm = fsm.TURN
                 else:
                     # do random walk 
+                    self.random_walk()
 
             if self._fsm == fsm.TURN:
                 self.rotate_rel(math.pi)
@@ -216,9 +221,9 @@ class BalloonPopper():
                     self.curr_linear_vel = self.linear_velocity*2
                     self.move(self.curr_linear_vel,0)
                 if self.left:
-                    self.move(0,self.angular_vel)
+                    self.move(0,self.angular_velocity)
                 if self.right:
-                    self.move(0, -self.angular_vel)
+                    self.move(0, -self.angular_velocity)
 
 
 
