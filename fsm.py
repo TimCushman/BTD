@@ -35,17 +35,21 @@ MIN_THRESHOLD_DISTANCE = 1.0 # m, threshold distance, should be smaller than ran
 MIN_SCAN_ANGLE_RAD = -30.0 / 180 * math.pi
 MAX_SCAN_ANGLE_RAD = +30.0 / 180 * math.pi
 
-#from lec_08_pa0_random_walk_fsm.py
+
+
+
 class fsm(Enum):
     RANDOM_WALK = 1
-    #RED_BALLON = 2
     GREEN_BALLOON = 2
     TURN = 3
     RETRY = 4
+    TURN_RIGHT = 5
+    TURN_LEFT = 6
 
 # implement fsm 
 class BalloonPopper():
-    def __init__(self, linear_velocity=LINEAR_VELOCITY, angular_velocity=ANGULAR_VELOCITY):
+    def __init__(self, linear_velocity=LINEAR_VELOCITY, angular_velocity=ANGULAR_VELOCITY, min_threshold_distance=MIN_THRESHOLD_DISTANCE,
+        scan_angle=[MIN_SCAN_ANGLE_RAD, MAX_SCAN_ANGLE_RAD]):
         """Constructor."""
 
         # Setting up publishers/subscribers.
@@ -54,39 +58,57 @@ class BalloonPopper():
         # Setting up subscriber receiving messages from the laser.
         self._laser_sub = rospy.Subscriber(DEFAULT_SCAN_TOPIC, LaserScan, self._laser_callback, queue_size=1)
 
-        self.angular_vel = angular_velocity
+        self.linear_velocity = linear_velocity # Constant linear velocity set.
+        self.angular_velocity = angular_velocity # Constant angular velocity set.
+        self.min_threshold_distance = min_threshold_distance
+        self.scan_angle = scan_angle
 
-        self.linear_vel = linear_velocity
+
         self.curr_linear_vel = self.linear_vel
-
         self._fsm = fsm.RANDOM_WALK
+
+        # Flag used to control the behavior of the robot.
+        self._close_obstacle = False # Flag variable that is true if there is a close obstacle.
 
         self.red = False
         self.green = False
         self.popped = False
 
+        # to check if the green baloon is in the center of the frame
+        self.center = False
+        self.left = False
+        self.right = False
+
     def _laser_callback(self, msg):
         # TODO: laser callback function (some of this might have to go in camera callback?)
         # deal with fsm states 
 
-        if self._fsm == fsm.GREEN_BALLOON:
-            # sense when robot gets too close to the balloon without popping, then retry also sense 
-            # if robot successfully pops balloon 
-            # will have to work with camera here, somehow set popped
-            if self.popped:
-                self._fsm == fsm.TURN
+        if not self._close_obstacle:
+            # angle increment of the scanner 
+            angle_increment = msg.angle_increment
+            # find the number of entries in the ranges array from the scan  message 
+            total_size= int((msg.angle_max - msg.angle_min)//angle_increment)
 
-        if self._fsm == fsm.RandomWalk:
-            # use sensors to look for red/ green balloons 
-            if self.red:
-                self._fsm == fsm.TURN
+            # find the number of indices below 0 and above 0 to check in the ranges 
+            scan_num_indices_more0 = int((MAX_SCAN_ANGLE_RAD//angle_increment))
+            scan_num_indices_less0 = int(MIN_SCAN_ANGLE_RAD//angle_increment)
 
-            if self.green:
-                self._fsm == fsm.GREEN_BALLOON
+            # the index of angle zero is in the middle of the ranges array, so to find the proper
+            # min and max index find the middle index of the total ranges array and use the values
+            # calucalted above to find the index
+            min_index = total_size//2 + scan_num_indices_less0
+            max_index = total_size//2 + scan_num_indices_more0
 
+            # only look at the range values within the scan angle and find the minimum 
+            range_values = msg.ranges[min_index:max_index + 1]
 
+            # If the minimum range value is closer to min_threshold_distance, change the flag self._close_obstacle
+            min_range = min(range_values)
 
-
+            if min_range < self.min_threshold_distance:
+                self._close_obstacle = True 
+            
+            ####### ANSWER CODE END #######
 
 # from pa0
     def move(self, linear_vel, angular_vel):
@@ -103,7 +125,6 @@ class BalloonPopper():
         twist_msg = Twist()
         self._cmd_pub.publish(twist_msg)
     
-
     def rotate_rel(self,angle):
         # Rate at which to operate the while loop.
         rate = rospy.Rate(FREQUENCY)
@@ -127,14 +148,61 @@ class BalloonPopper():
     
         rospy.sleep(1)
     
+    def random_walk(self):
+        rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
+        while not rospy.is_shutdown():
+            # Keep looping until user presses Ctrl+C
+            # If the flag self._close_obstacle is False, the robot should move forward.
+            # Otherwise, the robot should rotate for a random amount of time
+            # after which the flag is set again to False.
+            # Use the function move already implemented, passing the default velocities saved in the corresponding class members.
+            ####### TODO: ANSWER CODE BEGIN #######
+            if not self._close_obstacle:  
+                self.move(LINEAR_VELOCITY, 0)
+
+            else: 
+                # stop the robots motion 
+                self.stop()
+
+                # find a random angle between (-pi,pi)
+                new_angle = random.uniform(- math.pi, math.pi)
+
+                # find the absolute value of the time to see how long the robot should rotate for 
+                # to reach the desired angle 
+                time = abs(new_angle/self.angular_velocity)
+                
+                # adapted from lec03_example_go_forward.py 
+                start_time = rospy.get_rostime()
+
+                while True: 
+                    if rospy.get_rostime() - start_time >= rospy.Duration(time):
+                        break          
+                    # if the random angle is negative, rotate counterclockwise 
+                    if new_angle <= 0: 
+                        self.move(0, self.angular_velocity)
+                    # if the angle is positive rotate clockwise 
+                    else: 
+                        self.move(0, - self.angular_velocity)
+
+                self.stop()
+                # reset _close_obstacle 
+                self._close_obstacle = False              
+            ####### ANSWER CODE END #######
+            rate.sleep()
+
     def pop(self):
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
             if self._fsm == fsm.RANDOM_WALK:
                 # call random walk
-                random_walk = RandomWalk(linear_velocity=self.linear_vel, angular_velocity=self.angular_vel, min_threshold_distance=MIN_THRESHOLD_DISTANCE, scan_angle=[MIN_SCAN_ANGLE_RAD, MAX_SCAN_ANGLE_RAD])
-                random_walk.spin()
+                if self.green: 
+                    self._fsm = fsm.GREEN_BALLOON
+
+                if self.red:
+                    self._fsm = fsm.TURN
+                else:
+                    # do random walk 
 
             if self._fsm == fsm.TURN:
                 self.rotate_rel(math.pi)
@@ -144,8 +212,13 @@ class BalloonPopper():
 
             if self._fsm == fsm.GREEN_BALLOON:
                 # accelerate the robot, remember to reset the velovity after popping
-                self.curr_linear_vel = self.linear_velocity*2
-                self.move(self.curr_linear_vel,0)
+                if self.centered:
+                    self.curr_linear_vel = self.linear_velocity*2
+                    self.move(self.curr_linear_vel,0)
+                if self.left:
+                    self.move(0,self.angular_vel)
+                if self.right:
+                    self.move(0, -self.angular_vel)
 
 
 
