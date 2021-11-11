@@ -1,22 +1,33 @@
-#https://www.geeksforgeeks.org/multiple-color-detection-in-real-time-using-python-opencv/
+#Author: Timothy Cushman '23
+#Date: 11/11/21
+#Class: CS81 - Final Project
+#Program: Color Sensing with check if object is centered in the screen
+#Inputs: A live video stream
+#Outputs: If there is a red or green object present within the current frame. If the object is green, 
+#there is also a check if that object is centered within the sreen. 
+
+# The follow code within the function determineBalloonColor() was created by GeeksForGeeks user
+# @goodday451999 Last Updated : 10 May, 2020. The code has been since adapted to selecte a better range 
+# of values for our balloon colors and to make the code work better for our project. A link to the original
+# posting is:  
+# https://www.geeksforgeeks.org/multiple-color-detection-in-real-time-using-python-opencv/
+
 
 import numpy as np
 import cv2
   
-  
-# Capturing video through webcam
-webcam = cv2.VideoCapture(0)
-
-_, imageFrame = webcam.read()
-dimensions = imageFrame.shape
-#screenheight = imageFrame.shape[0] #height doesn't matter - delete if no longer needed
-screenwidth = imageFrame.shape[1]
-#channels = imageFrame.shape[2] #can delete don't think channels are important - Tim 
-
-#pas width/height
 
 # Start a while loop
 def determineBalloonColor():
+    # Capturing video through webcam
+    webcam = cv2.VideoCapture(0)
+
+    _, imageFrame = webcam.read()
+    dimensions = imageFrame.shape
+    #screenheight = imageFrame.shape[0] #height doesn't matter - delete if no longer needed
+    screenwidth = imageFrame.shape[1]
+    #print(screenwidth,"WIDTH") #should be 640 
+    #channels = imageFrame.shape[2] #can delete don't think channels are important - Tim 
     while(1):
         # Reading the video from the
         # webcam in image frames
@@ -33,6 +44,10 @@ def determineBalloonColor():
     
         # Set range for red color and 
         # define mask
+
+        # red_lower = np.array([5, 50, 50], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
+        # red_upper = np.array([15, 255, 255], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
+
         red_lower = np.array([136, 87, 111], np.uint8)
         red_upper = np.array([180, 255, 255], np.uint8)
         red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
@@ -67,8 +82,13 @@ def determineBalloonColor():
         
         for pic, contour in enumerate(contours):
             area = cv2.contourArea(contour)
-            if(area > 10000): #update for size of balloon
+            if(area > 10000): #updated for size of balloon
                 x, y, w, h = cv2.boundingRect(contour)
+                currentRedx1 = x
+                currentRedx2 = x+w
+                result = isCentered(currentRedx1,currentRedx2,screenwidth)
+                # pass results to another function
+                
                 imageFrame = cv2.rectangle(imageFrame, (x, y), 
                                         (x + w, y + h), 
                                         (0, 0, 255), 2) 
@@ -84,13 +104,14 @@ def determineBalloonColor():
         
         for pic, contour in enumerate(contours):
             area = cv2.contourArea(contour)
-            if(area > 10000): #update for size of balloon
+            if(area > 10000): #updated for size of balloon
                 x, y, w, h = cv2.boundingRect(contour)
                 currentGreenx1 = x
-                currentGreeny1 = y
                 currentGreenx2 = x+w
-                currentGreeny2 = y+h
                 result = isCentered(currentGreenx1,currentGreenx2,screenwidth)
+                
+                # pass results to another function
+
                 imageFrame = cv2.rectangle(imageFrame, (x, y), 
                                         (x + w, y + h),
                                         (0, 255, 0), 2)
@@ -108,17 +129,27 @@ def determineBalloonColor():
             break
 
 def isCentered(x1,x2,width):
+    buffer = 15 #set to help give a range to be within the center
     centerX = width/2
-    centerBoxX = (x2-x1)/2
+    centerBoxX = x1 + ((x2-x1)/2)
 
-    centerXLowRange = centerX - 40
-    centerXHighRange = centerX + 40  
-    if(centerBoxX+width > centerXLowRange and centerBoxX+width > centerXHighRange):
+    centerXLowRange = centerX - buffer
+    centerXHighRange = centerX + buffer
+
+    # Test print statements to help with centering
+    # print(centerBoxX,'BW')
+    # print(centerXLowRange,"LOW")
+    # print(centerXHighRange,"HIG")
+
+    if(centerBoxX < centerXHighRange and centerBoxX > centerXLowRange):
+        #print("Centered") #uncomment for easier testing of centering
         return 1 #centered
     else:
-        if(centerBoxX+width < centerXLowRange):
+        if(centerBoxX < centerXLowRange):
+            #print("tooLeft") #uncomment for easier testing of centering
             return 2 #object too far left, turn towards the left
         else:
+            #print("tooRight") #uncomment for easier testing of centering
             return 3 #object too far right, turn towards the right
 
 def main():
