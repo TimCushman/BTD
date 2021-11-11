@@ -25,7 +25,7 @@ DEFAULT_SCAN_TOPIC = 'scan' # name of topic for Stage simulator. For Gazebo, 'sc
 FREQUENCY = 10 #Hz.
 
 # Velocities that will be used (feel free to tune)
-LINEAR_VELOCITY = 0.2 # m/s
+LINEAR_VELOCITY = 0.3 # m/s
 ANGULAR_VELOCITY = math.pi/4 # rad/s
 
 # Threshold of minimum clearance distance (feel free to tune)
@@ -37,7 +37,9 @@ MAX_SCAN_ANGLE_RAD = +30.0 / 180 * math.pi
 
 
 
-
+# maybe add a state "popped" that the robot will go into right after it pops the balloon 
+# so it doesnt run into a wall with the knife, might not need retry bc knife is sharp, 
+# could also just enter into turn state right after it popps, so it turns robot 180 and continues to random walk 
 class fsm(Enum):
     RANDOM_WALK = 1
     GREEN_BALLOON = 2
@@ -45,6 +47,7 @@ class fsm(Enum):
     RETRY = 4
     TURN_RIGHT = 5
     TURN_LEFT = 6
+
 
 # implement fsm 
 class BalloonPopper():
@@ -83,35 +86,23 @@ class BalloonPopper():
         # TODO: laser callback function (some of this might have to go in camera callback?)
         # deal with fsm states 
 
-        # robot will only be random walking when green flag and red flag are false 
+        # robot will only be random walking when green flag and red flag are false, thus only needs to run this loop when 
+        # in the process of random walking 
         if not self._close_obstacle and not self.green and not self.red:
-            # angle increment of the scanner 
-            angle_increment = msg.angle_increment
-            # find the number of entries in the ranges array from the scan  message 
-            total_size= int((msg.angle_max - msg.angle_min)//angle_increment)
-
-            # find the number of indices below 0 and above 0 to check in the ranges 
-            scan_num_indices_more0 = int((MAX_SCAN_ANGLE_RAD//angle_increment))
-            scan_num_indices_less0 = int(MIN_SCAN_ANGLE_RAD//angle_increment)
-
-            # the index of angle zero is in the middle of the ranges array, so to find the proper
-            # min and max index find the middle index of the total ranges array and use the values
-            # calucalted above to find the index
-            min_index = total_size//2 + scan_num_indices_less0
-            max_index = total_size//2 + scan_num_indices_more0
+            min_index = int((self.scan_angle[0] - msg.angle_min) / msg.angle_increment)
+            max_index = int((self.scan_angle[1] - msg.angle_min) / msg.angle_increment)
 
             # only look at the range values within the scan angle and find the minimum 
             range_values = msg.ranges[min_index:max_index + 1]
 
             # If the minimum range value is closer to min_threshold_distance, change the flag self._close_obstacle
             min_range = min(range_values)
-
             if min_range < self.min_threshold_distance:
                 self._close_obstacle = True 
             
             ####### ANSWER CODE END #######
 
-# from pa0
+    # from pa0
     def move(self, linear_vel, angular_vel):
         """Send a velocity command (linear vel in m/s, angular vel in rad/s)."""
         # Setting velocities.
@@ -148,16 +139,12 @@ class BalloonPopper():
             rate.sleep()
     
         rospy.sleep(1)
-    
+
+    # code adapted from pa0
     def random_walk(self):
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
-            # Keep looping until user presses Ctrl+C
-            # If the flag self._close_obstacle is False, the robot should move forward.
-            # Otherwise, the robot should rotate for a random amount of time
-            # after which the flag is set again to False.
-            # Use the function move already implemented, passing the default velocities saved in the corresponding class members.
-            ####### TODO: ANSWER CODE BEGIN #######
+            # break out of loop if a green/red balloon is sensed
             if self.green or self.red: 
                 break
 
@@ -191,7 +178,7 @@ class BalloonPopper():
                 self.stop()
                 # reset _close_obstacle 
                 self._close_obstacle = False              
-            ####### ANSWER CODE END #######
+
             rate.sleep()
 
     def pop(self):
@@ -224,6 +211,7 @@ class BalloonPopper():
                     self.move(0,self.angular_velocity)
                 if self.right:
                     self.move(0, -self.angular_velocity)
+
 
 
 
