@@ -7,6 +7,8 @@
 # Import of python modules.
 import math # use of pi.
 import random # to find random angle 
+import numpy as np
+import cv2
 
 
 # import of relevant libraries.
@@ -15,6 +17,7 @@ from geometry_msgs.msg import Twist # message type for cmd_vel
 from sensor_msgs.msg import LaserScan # message type for scan
 from enum import Enum
 from random_walk import RandomWalk
+
 
 # Constants.
 # Topic names
@@ -100,7 +103,6 @@ class BalloonPopper():
             if min_range < self.min_threshold_distance:
                 self._close_obstacle = True 
             
-            ####### ANSWER CODE END #######
 
     # from pa0
     def move(self, linear_vel, angular_vel):
@@ -181,6 +183,25 @@ class BalloonPopper():
 
             rate.sleep()
 
+    def translate(self, d):
+        # Rate at which to operate the while loop.
+        rate = rospy.Rate(FREQUENCY)
+        start_time = rospy.get_rostime()
+        while not rospy.is_shutdown():
+            # Check if done.
+            
+            duration = rospy.Duration(abs(d/self.linear_velocity))
+            #print(duration)
+            
+            if rospy.get_rostime() - start_time <= duration:
+                self.move(self.linear_velocity, 0)
+            else:
+                break 
+            
+            # Sleep to keep the set frequency.
+            rate.sleep()
+
+
     def pop(self):
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
@@ -199,19 +220,173 @@ class BalloonPopper():
             if self._fsm == fsm.TURN:
                 self.rotate_rel(math.pi)
                 # set state back to random walk after turning 
+                self.red = False
                 self._fsm == fsm.RandomWalk
+                
 
 
             if self._fsm == fsm.GREEN_BALLOON:
                 # accelerate the robot, remember to reset the velovity after popping
                 if self.centered:
-                    self.curr_linear_vel = self.linear_velocity*2
-                    self.move(self.curr_linear_vel,0)
+                    # for now just move a little forward and then stop and continue random walk 
+                    #self.curr_linear_vel = self.linear_velocity*1.5
+                    #self.move(self.curr_linear_vel,0)
+                    self.translate(.3)
+                    self.green = False 
+                    self._fsm = fsm.TURN
+
                 if self.left:
                     self.move(0,self.angular_velocity)
                 if self.right:
                     self.move(0, -self.angular_velocity)
 
+            rate.sleep()
+
+
+
+    # Start a while loop
+    def determineBalloonColor(self):
+        # Capturing video through webcam
+        webcam = cv2.VideoCapture(0)
+
+        _, imageFrame = webcam.read()
+        dimensions = imageFrame.shape
+        #screenheight = imageFrame.shape[0] #height doesn't matter - delete if no longer needed
+        screenwidth = imageFrame.shape[1]
+        #print(screenwidth,"WIDTH") #should be 640 
+        #channels = imageFrame.shape[2] #can delete don't think channels are important - Tim 
+        while(1):
+            # Reading the video from the
+            # webcam in image frames
+            _, imageFrame = webcam.read()
+
+            # height, width, number of channels in image
+
+            
+            # Convert the imageFrame in 
+            # BGR(RGB color space) to 
+            # HSV(hue-saturation-value)
+            # color space
+            hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
+        
+            # Set range for red color and 
+            # define mask
+
+            # red_lower = np.array([5, 50, 50], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
+            # red_upper = np.array([15, 255, 255], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
+
+            red_lower = np.array([136, 87, 111], np.uint8)
+            red_upper = np.array([180, 255, 255], np.uint8)
+            red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
+        
+            # Set range for green color and 
+            # define mask
+            green_lower = np.array([25, 52, 72], np.uint8)
+            green_upper = np.array([102, 255, 255], np.uint8)
+            green_mask = cv2.inRange(hsvFrame, green_lower, green_upper)
+        
+
+            # Morphological Transform, Dilation
+            # for each color and bitwise_and operator
+            # between imageFrame and mask determines
+            # to detect only that particular color
+            kernal = np.ones((5, 5), "uint8")
+            
+            # For red color
+            red_mask = cv2.dilate(red_mask, kernal)
+            res_red = cv2.bitwise_and(imageFrame, imageFrame, 
+                                    mask = red_mask)
+            
+            # For green color
+            green_mask = cv2.dilate(green_mask, kernal)
+            res_green = cv2.bitwise_and(imageFrame, imageFrame,
+                                        mask = green_mask)
+
+            # Creating contour to track red color
+            contours, hierarchy = cv2.findContours(red_mask,
+                                                cv2.RETR_TREE,
+                                                cv2.CHAIN_APPROX_SIMPLE)
+            
+            for pic, contour in enumerate(contours):
+                area = cv2.contourArea(contour)
+                if(area > 10000): #updated for size of balloon
+                    x, y, w, h = cv2.boundingRect(contour)
+                    currentRedx1 = x
+                    currentRedx2 = x+w
+                    result = isCentered(currentRedx1,currentRedx2,screenwidth)
+                    # pass results to another function
+                    
+                    imageFrame = cv2.rectangle(imageFrame, (x, y), 
+                                            (x + w, y + h), 
+                                            (0, 0, 255), 2) 
+                    
+                    cv2.putText(imageFrame, "Red Color", (x, y),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                                (0, 0, 255))    
+        
+            # Creating contour to track green color
+            contours, hierarchy = cv2.findContours(green_mask,
+                                                cv2.RETR_TREE,
+                                                cv2.CHAIN_APPROX_SIMPLE)
+            
+            for pic, contour in enumerate(contours):
+                area = cv2.contourArea(contour)
+                if(area > 10000): #updated for size of balloon
+                    x, y, w, h = cv2.boundingRect(contour)
+                    currentGreenx1 = x
+                    currentGreenx2 = x+w
+                    result = isCentered(currentGreenx1,currentGreenx2,screenwidth)
+                    
+                    # pass results to another function
+
+                    imageFrame = cv2.rectangle(imageFrame, (x, y), 
+                                            (x + w, y + h),
+                                            (0, 255, 0), 2)
+                    
+                    cv2.putText(imageFrame, "Green Color", (x, y),
+                                cv2.FONT_HERSHEY_SIMPLEX, 
+                                1.0, (0, 255, 0))
+        
+
+            # Program Termination
+            cv2.imshow("Multiple Color Detection in Real-TIme", imageFrame)
+            if cv2.waitKey(10) & 0xFF == ord('q'):
+                cap.release()
+                cv2.destroyAllWindows()
+                break
+
+    def isCentered(self,x1,x2,width):
+        buffer = 15 #set to help give a range to be within the center
+        centerX = width/2
+        centerBoxX = x1 + ((x2-x1)/2)
+
+        centerXLowRange = centerX - buffer
+        centerXHighRange = centerX + buffer
+
+        # Test print statements to help with centering
+        # print(centerBoxX,'BW')
+        # print(centerXLowRange,"LOW")
+        # print(centerXHighRange,"HIG")
+
+        if(centerBoxX < centerXHighRange and centerBoxX > centerXLowRange):
+            #print("Centered") #uncomment for easier testing of centering
+            #return 1 #centered
+            self.center = True
+            self.right = False
+            self.left = False
+        else:
+            if(centerBoxX < centerXLowRange):
+                #print("tooLeft") #uncomment for easier testing of centering
+                #return 2 #object too far left, turn towards the left
+                self.center = False
+                self.right = False
+                self.left = True
+            else:
+                #print("tooRight") #uncomment for easier testing of centering
+                #return 3 #object too far right, turn towards the right
+                self.center = False
+                self.right = True
+                self.left = False
 
 
 
