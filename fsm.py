@@ -9,6 +9,7 @@ import math # use of pi.
 import random # to find random angle 
 import numpy as np
 import cv2
+from cv_bridge import CvBridge
 
 
 # import of relevant libraries.
@@ -16,13 +17,15 @@ import rospy # module for ROS APIs
 from geometry_msgs.msg import Twist # message type for cmd_vel
 from sensor_msgs.msg import LaserScan # message type for scan
 from enum import Enum
-from random_walk import RandomWalk
+
+from sensor_msgs.msg import Image, CompressedImage
 
 
 # Constants.
 # Topic names
 DEFAULT_CMD_VEL_TOPIC = 'cmd_vel'
 DEFAULT_SCAN_TOPIC = 'scan' # name of topic for Stage simulator. For Gazebo, 'scan'
+DEFAULT_IMAGE_TOPIC = "/camera/rgb/image_raw"
 
 # Frequency at which the loop operates
 FREQUENCY = 10 #Hz.
@@ -62,7 +65,16 @@ class BalloonPopper():
         # Setting up the publisher to send velocity commands.
         self._cmd_pub = rospy.Publisher(DEFAULT_CMD_VEL_TOPIC, Twist, queue_size=1)
         # Setting up subscriber receiving messages from the laser.
-        self._laser_sub = rospy.Subscriber(DEFAULT_SCAN_TOPIC, LaserScan, self._laser_callback, queue_size=1)
+        
+        #self._laser_sub = rospy.Subscriber(DEFAULT_SCAN_TOPIC, LaserScan, self._laser_callback, queue_size=1)
+
+
+        # image subscriber 
+        self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, Image, self.image_callback)
+
+        self.br = CvBridge()
+        self.image = None
+
 
         self.linear_velocity = linear_velocity # Constant linear velocity set.
         self.angular_velocity = angular_velocity # Constant angular velocity set.
@@ -70,7 +82,7 @@ class BalloonPopper():
         self.scan_angle = scan_angle
 
 
-        self.curr_linear_vel = self.linear_vel
+        self.curr_linear_vel = self.linear_velocity
         self._fsm = fsm.RANDOM_WALK
 
         # Flag used to control the behavior of the robot.
@@ -103,6 +115,13 @@ class BalloonPopper():
             if min_range < self.min_threshold_distance:
                 self._close_obstacle = True 
             
+    def image_callback(self, img_msg):
+        
+        rospy.loginfo(img_msg.header)
+        self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
+        print(self.image)
+        #self.determineBalloonColor()
+
 
     # from pa0
     def move(self, linear_vel, angular_vel):
@@ -241,16 +260,21 @@ class BalloonPopper():
                     self.move(0, -self.angular_velocity)
 
             rate.sleep()
+   
+   
+    def go(self):
+        rospy.spin()
 
 
 
     # Start a while loop
     def determineBalloonColor(self):
         # Capturing video through webcam
-        webcam = cv2.VideoCapture(0)
-
-        _, imageFrame = webcam.read()
+        #webcam = cv2.VideoCapture(0)
+        imageFrame = self.image
+        #_, imageFrame = webcam.read()
         dimensions = imageFrame.shape
+        
         #screenheight = imageFrame.shape[0] #height doesn't matter - delete if no longer needed
         screenwidth = imageFrame.shape[1]
         #print(screenwidth,"WIDTH") #should be 640 
@@ -258,7 +282,7 @@ class BalloonPopper():
         while(1):
             # Reading the video from the
             # webcam in image frames
-            _, imageFrame = webcam.read()
+            #_, imageFrame = webcam.read()
 
             # height, width, number of channels in image
 
@@ -335,7 +359,7 @@ class BalloonPopper():
                     x, y, w, h = cv2.boundingRect(contour)
                     currentGreenx1 = x
                     currentGreenx2 = x+w
-                    result = self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
+                    self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
                     
                     # pass results to another function
 
@@ -369,20 +393,20 @@ class BalloonPopper():
         # print(centerXHighRange,"HIG")
 
         if(centerBoxX < centerXHighRange and centerBoxX > centerXLowRange):
-            #print("Centered") #uncomment for easier testing of centering
+            print("Centered") #uncomment for easier testing of centering
             #return 1 #centered
             self.center = True
             self.right = False
             self.left = False
         else:
             if(centerBoxX < centerXLowRange):
-                #print("tooLeft") #uncomment for easier testing of centering
+                print("tooLeft") #uncomment for easier testing of centering
                 #return 2 #object too far left, turn towards the left
                 self.center = False
                 self.right = False
                 self.left = True
             else:
-                #print("tooRight") #uncomment for easier testing of centering
+                print("tooRight") #uncomment for easier testing of centering
                 #return 3 #object too far right, turn towards the right
                 self.center = False
                 self.right = True
@@ -407,7 +431,8 @@ def main():
 
     # Robot finds green balloons, and pops them, avoiding red ballons
     try:
-        balloon_popper.pop()
+        
+        balloon_popper.go()
     except rospy.ROSInterruptException:
         rospy.logerr("ROS node interrupted.")
 
