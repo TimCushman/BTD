@@ -29,7 +29,7 @@ DEFAULT_IMAGE_TOPIC = "/camera/rgb/image_raw/compressed"
 #DEFAULT_IMAGE_TOPIC = "/camera/rgb/image_rect_color"
 
 # Frequency at which the loop operates
-FREQUENCY = 10 #Hz.
+FREQUENCY = 3 #Hz.
 
 # Velocities that will be used (feel free to tune)
 LINEAR_VELOCITY = 0.3 # m/s
@@ -54,6 +54,7 @@ class fsm(Enum):
     RETRY = 4
     TURN_RIGHT = 5
     TURN_LEFT = 6
+    STOP = 7
 
 
 # implement fsm 
@@ -73,7 +74,6 @@ class BalloonPopper():
         # image subscriber 
         self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback)
         #self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, Image, self.image_callback, queue_size=1)
-        print("main")
         self.image = None
 
         self.bridge = CvBridge()
@@ -85,7 +85,8 @@ class BalloonPopper():
 
 
         self.curr_linear_vel = self.linear_velocity
-        self._fsm = fsm.RANDOM_WALK
+        
+        self._fsm = fsm.STOP
 
         # Flag used to control the behavior of the robot.
         self._close_obstacle = False # Flag variable that is true if there is a close obstacle.
@@ -233,6 +234,7 @@ class BalloonPopper():
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
+            print(self._fsm)
         #     if self._fsm == fsm.RANDOM_WALK:
         #         # call random walk
         #         if self.green: 
@@ -263,13 +265,16 @@ class BalloonPopper():
                     #self.translate(.3)
                     #self.green = False 
                     #self._fsm = fsm.TURN
-                    self.stop()
-                    pass
+                    self._fsm == fsm.STOP
+                    
 
                 if self.left:
                     self.move(0,self.angular_velocity)
                 if self.right:
                     self.move(0, -self.angular_velocity)
+
+            if self._fsm == fsm.STOP:
+                self.move(0,0)
 
             rate.sleep()
    
@@ -282,7 +287,7 @@ class BalloonPopper():
 
     # Start a while loop
     def determineBalloonColor(self):
-        print("determining color")
+        #print("determining color")
         # Capturing video through webcam
         #webcam = cv2.VideoCapture(0)
         imageFrame = self.image
@@ -404,7 +409,6 @@ class BalloonPopper():
 
 
     def isCentered(self,x1,x2,width):
-        print("checking is centered")
         buffer = 15 #set to help give a range to be within the center
         centerX = width/2
         centerBoxX = x1 + ((x2-x1)/2)
