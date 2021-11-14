@@ -26,6 +26,7 @@ from sensor_msgs.msg import Image, CompressedImage
 DEFAULT_CMD_VEL_TOPIC = 'cmd_vel'
 DEFAULT_SCAN_TOPIC = 'scan' # name of topic for Stage simulator. For Gazebo, 'scan'
 DEFAULT_IMAGE_TOPIC = "/camera/rgb/image_raw/compressed"
+#DEFAULT_IMAGE_TOPIC = "/camera/rgb/image_rect_color"
 
 # Frequency at which the loop operates
 FREQUENCY = 10 #Hz.
@@ -70,8 +71,8 @@ class BalloonPopper():
 
 
         # image subscriber 
-        #self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback)
-        self._img_sub = rospy.Subscriber('image_color_rect', Image, self.image_callback, queue_size=1)
+        self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback)
+        #self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, Image, self.image_callback, queue_size=1)
         print("main")
         self.image = None
 
@@ -120,11 +121,12 @@ class BalloonPopper():
         
         rospy.loginfo(img_msg.header)
         #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
-        # img_arr = np.fromstring(img_msg.data, np.uint8)
-        # img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-        # self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         print("incallback")
-        self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
+        img_arr = np.fromstring(img_msg.data, np.uint8)
+        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+        self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        
+        #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
         
         self.determineBalloonColor()
 
@@ -333,9 +335,13 @@ class BalloonPopper():
             green_mask = cv2.dilate(green_mask, kernal)
             res_green = cv2.bitwise_and(imageFrame, imageFrame,
                                         mask = green_mask)
-
+            print("contours")                           
+            c = cv2.findContours(red_mask,
+                                                cv2.RETR_TREE,
+                                                cv2.CHAIN_APPROX_SIMPLE)
+            print(len(c))
             # Creating contour to track red color
-            contours, hierarchy = cv2.findContours(red_mask,
+            _, contours, hierarchy = cv2.findContours(red_mask,
                                                 cv2.RETR_TREE,
                                                 cv2.CHAIN_APPROX_SIMPLE)
             
@@ -357,7 +363,7 @@ class BalloonPopper():
                                 (0, 0, 255))    
         
             # Creating contour to track green color
-            contours, hierarchy = cv2.findContours(green_mask,
+            _,contours, hierarchy = cv2.findContours(green_mask,
                                                 cv2.RETR_TREE,
                                                 cv2.CHAIN_APPROX_SIMPLE)
             
