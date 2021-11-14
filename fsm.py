@@ -9,7 +9,7 @@ import math # use of pi.
 import random # to find random angle 
 import numpy as np
 import cv2
-# from cv_bridge import CvBridge
+from cv_bridge import CvBridge
 
 
 # import of relevant libraries.
@@ -70,11 +70,12 @@ class BalloonPopper():
 
 
         # image subscriber 
-        self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback)
-
-        #self.br = CvBridge()
+        #self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback)
+        self._img_sub = rospy.Subscriber('image_color_rect', Image, self.image_callback, queue_size=1)
+        print("main")
         self.image = None
 
+        self.bridge = CvBridge()
 
         self.linear_velocity = linear_velocity # Constant linear velocity set.
         self.angular_velocity = angular_velocity # Constant angular velocity set.
@@ -118,12 +119,13 @@ class BalloonPopper():
     def image_callback(self, img_msg):
         
         rospy.loginfo(img_msg.header)
-        # self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
-        img_arr = np.fromstring(img_msg.data, np.uint8)
-        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-        self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-
-
+        #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
+        # img_arr = np.fromstring(img_msg.data, np.uint8)
+        # img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+        # self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        print("incallback")
+        self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
+        
         self.determineBalloonColor()
 
 
@@ -273,9 +275,11 @@ class BalloonPopper():
 
     # Start a while loop
     def determineBalloonColor(self):
+        print("determining color")
         # Capturing video through webcam
         #webcam = cv2.VideoCapture(0)
         imageFrame = self.image
+        #print(imageFrame)
         #_, imageFrame = webcam.read()
         dimensions = imageFrame.shape
         
