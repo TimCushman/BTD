@@ -9,7 +9,7 @@ import math # use of pi.
 import random # to find random angle 
 import numpy as np
 import cv2
-from cv_bridge import CvBridge
+# from cv_bridge import CvBridge
 
 
 # import of relevant libraries.
@@ -25,7 +25,7 @@ from sensor_msgs.msg import Image, CompressedImage
 # Topic names
 DEFAULT_CMD_VEL_TOPIC = 'cmd_vel'
 DEFAULT_SCAN_TOPIC = 'scan' # name of topic for Stage simulator. For Gazebo, 'scan'
-DEFAULT_IMAGE_TOPIC = "/camera/rgb/image_raw"
+DEFAULT_IMAGE_TOPIC = "/camera/rgb/image_raw/compressed"
 
 # Frequency at which the loop operates
 FREQUENCY = 10 #Hz.
@@ -70,9 +70,9 @@ class BalloonPopper():
 
 
         # image subscriber 
-        self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, Image, self.image_callback)
+        self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback)
 
-        self.br = CvBridge()
+        #self.br = CvBridge()
         self.image = None
 
 
@@ -118,9 +118,13 @@ class BalloonPopper():
     def image_callback(self, img_msg):
         
         rospy.loginfo(img_msg.header)
-        self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
-        print(self.image)
-        #self.determineBalloonColor()
+        # self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
+        img_arr = np.fromstring(img_msg.data, np.uint8)
+        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+        self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+
+        self.determineBalloonColor()
 
 
     # from pa0
@@ -380,6 +384,7 @@ class BalloonPopper():
                 break
 
     def isCentered(self,x1,x2,width):
+        print("checking is centered")
         buffer = 15 #set to help give a range to be within the center
         centerX = width/2
         centerBoxX = x1 + ((x2-x1)/2)
