@@ -33,7 +33,7 @@ FREQUENCY = 10 #Hz.
 
 # Velocities that will be used (feel free to tune)
 LINEAR_VELOCITY = 0.3 # m/s
-ANGULAR_VELOCITY = math.pi/4 # rad/s
+ANGULAR_VELOCITY = math.pi/10 # rad/s
 
 # Threshold of minimum clearance distance (feel free to tune)
 MIN_THRESHOLD_DISTANCE = 1.0 # m, threshold distance, should be smaller than range_max
@@ -233,34 +233,38 @@ class BalloonPopper():
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
-            if self._fsm == fsm.RANDOM_WALK:
-                # call random walk
-                if self.green: 
-                    self._fsm = fsm.GREEN_BALLOON
+        #     if self._fsm == fsm.RANDOM_WALK:
+        #         # call random walk
+        #         if self.green: 
+        #             self._fsm = fsm.GREEN_BALLOON
 
-                if self.red:
-                    self._fsm = fsm.TURN
-                else:
-                    # do random walk 
-                    self.random_walk()
+        #         if self.red:
+        #             self._fsm = fsm.TURN
+        #         else:
+        #             # do random walk 
+        #             self.random_walk()
 
-            if self._fsm == fsm.TURN:
-                self.rotate_rel(math.pi)
-                # set state back to random walk after turning 
-                self.red = False
-                self._fsm == fsm.RandomWalk
+        #     if self._fsm == fsm.TURN:
+        #         self.rotate_rel(math.pi)
+        #         # set state back to random walk after turning 
+        #         self.red = False
+        #         self._fsm == fsm.RandomWalk
                 
 
+            if self.green == True:
+                self._fsm = fsm.GREEN_BALLOON
 
             if self._fsm == fsm.GREEN_BALLOON:
                 # accelerate the robot, remember to reset the velovity after popping
-                if self.centered:
+                if self.center:
                     # for now just move a little forward and then stop and continue random walk 
                     #self.curr_linear_vel = self.linear_velocity*1.5
                     #self.move(self.curr_linear_vel,0)
-                    self.translate(.3)
-                    self.green = False 
-                    self._fsm = fsm.TURN
+                    #self.translate(.3)
+                    #self.green = False 
+                    #self._fsm = fsm.TURN
+                    self.stop()
+                    pass
 
                 if self.left:
                     self.move(0,self.angular_velocity)
@@ -271,6 +275,7 @@ class BalloonPopper():
    
    
     def go(self):
+        self.pop()
         rospy.spin()
 
 
@@ -289,107 +294,113 @@ class BalloonPopper():
         screenwidth = imageFrame.shape[1]
         #print(screenwidth,"WIDTH") #should be 640 
         #channels = imageFrame.shape[2] #can delete don't think channels are important - Tim 
-        while(1):
-            # Reading the video from the
-            # webcam in image frames
-            #_, imageFrame = webcam.read()
+    #while(1)
+        # Reading the video from the
+        # webcam in image frames
+        #_, imageFrame = webcam.read()
 
-            # height, width, number of channels in image
+        # height, width, number of channels in image
 
-            
-            # Convert the imageFrame in 
-            # BGR(RGB color space) to 
-            # HSV(hue-saturation-value)
-            # color space
-            hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
         
-            # Set range for red color and 
-            # define mask
+        # Convert the imageFrame in 
+        # BGR(RGB color space) to 
+        # HSV(hue-saturation-value)
+        # color space
+        hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
+    
+        # Set range for red color and 
+        # define mask
 
-            # red_lower = np.array([5, 50, 50], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
-            # red_upper = np.array([15, 255, 255], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
+        # red_lower = np.array([5, 50, 50], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
+        # red_upper = np.array([15, 255, 255], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
 
-            red_lower = np.array([136, 87, 111], np.uint8)
-            red_upper = np.array([180, 255, 255], np.uint8)
-            red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
+        red_lower = np.array([136, 87, 111], np.uint8)
+        red_upper = np.array([180, 255, 255], np.uint8)
+        red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
+    
+        # Set range for green color and 
+        # define mask
+        green_lower = np.array([25, 52, 72], np.uint8)
+        green_upper = np.array([102, 255, 255], np.uint8)
+        green_mask = cv2.inRange(hsvFrame, green_lower, green_upper)
+    
+
+        # Morphological Transform, Dilation
+        # for each color and bitwise_and operator
+        # between imageFrame and mask determines
+        # to detect only that particular color
+        kernal = np.ones((5, 5), "uint8")
         
-            # Set range for green color and 
-            # define mask
-            green_lower = np.array([25, 52, 72], np.uint8)
-            green_upper = np.array([102, 255, 255], np.uint8)
-            green_mask = cv2.inRange(hsvFrame, green_lower, green_upper)
+        # For red color
+        red_mask = cv2.dilate(red_mask, kernal)
+        res_red = cv2.bitwise_and(imageFrame, imageFrame, 
+                                mask = red_mask)
         
+        # For green color
+        green_mask = cv2.dilate(green_mask, kernal)
+        res_green = cv2.bitwise_and(imageFrame, imageFrame,
+                                    mask = green_mask)                      
+        c = cv2.findContours(red_mask,
+                                            cv2.RETR_TREE,
+                                            cv2.CHAIN_APPROX_SIMPLE)
+        # Creating contour to track red color
+        _, contours, hierarchy = cv2.findContours(red_mask,
+                                            cv2.RETR_TREE,
+                                            cv2.CHAIN_APPROX_SIMPLE)
+        for pic, contour in enumerate(contours):
+            area = cv2.contourArea(contour)
+            if(area > 1000): #updated for size of balloon
+                x, y, w, h = cv2.boundingRect(contour)
+                currentRedx1 = x
+                currentRedx2 = x+w
+                #result = self.isCentered(currentRedx1,currentRedx2,screenwidth)
+                # pass results to another function
+                
+                imageFrame = cv2.rectangle(imageFrame, (x, y), 
+                                        (x + w, y + h), 
+                                        (0, 0, 255), 2) 
+                
+                cv2.putText(imageFrame, "Red Color", (x, y),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                            (0, 0, 255))  
+                print("RED")  
+                self.red = True 
+            else: 
+                self.red = False
+    
+        # Creating contour to track green color
+        _,contours, hierarchy = cv2.findContours(green_mask,
+                                            cv2.RETR_TREE,
+                                            cv2.CHAIN_APPROX_SIMPLE)
+        for pic, contour in enumerate(contours):
+            area = cv2.contourArea(contour)
+            if(area > 1000): #updated for size of balloon
+                x, y, w, h = cv2.boundingRect(contour)
+                currentGreenx1 = x
+                currentGreenx2 = x+w
+                print("GREEN")
+                self.green = True
+                self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
+                
+                # pass results to another function
 
-            # Morphological Transform, Dilation
-            # for each color and bitwise_and operator
-            # between imageFrame and mask determines
-            # to detect only that particular color
-            kernal = np.ones((5, 5), "uint8")
-            
-            # For red color
-            red_mask = cv2.dilate(red_mask, kernal)
-            res_red = cv2.bitwise_and(imageFrame, imageFrame, 
-                                    mask = red_mask)
-            
-            # For green color
-            green_mask = cv2.dilate(green_mask, kernal)
-            res_green = cv2.bitwise_and(imageFrame, imageFrame,
-                                        mask = green_mask)                      
-            c = cv2.findContours(red_mask,
-                                                cv2.RETR_TREE,
-                                                cv2.CHAIN_APPROX_SIMPLE)
-            # Creating contour to track red color
-            _, contours, hierarchy = cv2.findContours(red_mask,
-                                                cv2.RETR_TREE,
-                                                cv2.CHAIN_APPROX_SIMPLE)
-            for pic, contour in enumerate(contours):
-                area = cv2.contourArea(contour)
-                if(area > 1000): #updated for size of balloon
-                    x, y, w, h = cv2.boundingRect(contour)
-                    currentRedx1 = x
-                    currentRedx2 = x+w
-                    #result = self.isCentered(currentRedx1,currentRedx2,screenwidth)
-                    # pass results to another function
-                    
-                    imageFrame = cv2.rectangle(imageFrame, (x, y), 
-                                            (x + w, y + h), 
-                                            (0, 0, 255), 2) 
-                    
-                    cv2.putText(imageFrame, "Red Color", (x, y),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                                (0, 0, 255))    
-        
-            # Creating contour to track green color
-            _,contours, hierarchy = cv2.findContours(green_mask,
-                                                cv2.RETR_TREE,
-                                                cv2.CHAIN_APPROX_SIMPLE)
-            for pic, contour in enumerate(contours):
-                area = cv2.contourArea(contour)
-                if(area > 1000): #updated for size of balloon
-                    x, y, w, h = cv2.boundingRect(contour)
-                    currentGreenx1 = x
-                    currentGreenx2 = x+w
-                    print("GREEN")
-                    self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
-                    
-                    # pass results to another function
+                imageFrame = cv2.rectangle(imageFrame, (x, y), 
+                                        (x + w, y + h),
+                                        (0, 255, 0), 2)
+                
+                cv2.putText(imageFrame, "Green Color", (x, y),
+                            cv2.FONT_HERSHEY_SIMPLEX, 
+                            1.0, (0, 255, 0))
+            else: 
+                self.green = False
 
-                    imageFrame = cv2.rectangle(imageFrame, (x, y), 
-                                            (x + w, y + h),
-                                            (0, 255, 0), 2)
-                    
-                    cv2.putText(imageFrame, "Green Color", (x, y),
-                                cv2.FONT_HERSHEY_SIMPLEX, 
-                                1.0, (0, 255, 0))
-        
-
-            # Program Termination
-            # cv2.imshow("Multiple Color Detection in Real-Time", imageFrame)
-            # if cv2.waitKey(10) & 0xFF == ord('q'):
-            #     print("GOT3")
-            #     cap.release()
-            #     cv2.destroyAllWindows()
-            #     break
+        # Program Termination
+        # cv2.imshow("Multiple Color Detection in Real-Time", imageFrame)
+        # if cv2.waitKey(10) & 0xFF == ord('q'):
+        #     print("GOT3")
+        #     cap.release()
+        #     cv2.destroyAllWindows()
+        #     break
 
 
     def isCentered(self,x1,x2,width):
