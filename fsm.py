@@ -351,7 +351,7 @@ class BalloonPopper():
                     x, y, w, h = cv2.boundingRect(contour)
                     currentRedx1 = x
                     currentRedx2 = x+w
-                    result = isCentered(currentRedx1,currentRedx2,screenwidth)
+                    result = self.isCentered(currentRedx1,currentRedx2,screenwidth)
                     # pass results to another function
                     
                     imageFrame = cv2.rectangle(imageFrame, (x, y), 
