@@ -334,24 +334,21 @@ class BalloonPopper():
             # For green color
             green_mask = cv2.dilate(green_mask, kernal)
             res_green = cv2.bitwise_and(imageFrame, imageFrame,
-                                        mask = green_mask)
-            print("contours")                           
+                                        mask = green_mask)                      
             c = cv2.findContours(red_mask,
                                                 cv2.RETR_TREE,
                                                 cv2.CHAIN_APPROX_SIMPLE)
-            print(len(c))
             # Creating contour to track red color
             _, contours, hierarchy = cv2.findContours(red_mask,
                                                 cv2.RETR_TREE,
                                                 cv2.CHAIN_APPROX_SIMPLE)
-            
             for pic, contour in enumerate(contours):
                 area = cv2.contourArea(contour)
-                if(area > 10000): #updated for size of balloon
+                if(area > 1000): #updated for size of balloon
                     x, y, w, h = cv2.boundingRect(contour)
                     currentRedx1 = x
                     currentRedx2 = x+w
-                    result = self.isCentered(currentRedx1,currentRedx2,screenwidth)
+                    #result = self.isCentered(currentRedx1,currentRedx2,screenwidth)
                     # pass results to another function
                     
                     imageFrame = cv2.rectangle(imageFrame, (x, y), 
@@ -366,13 +363,13 @@ class BalloonPopper():
             _,contours, hierarchy = cv2.findContours(green_mask,
                                                 cv2.RETR_TREE,
                                                 cv2.CHAIN_APPROX_SIMPLE)
-            
             for pic, contour in enumerate(contours):
                 area = cv2.contourArea(contour)
-                if(area > 10000): #updated for size of balloon
+                if(area > 1000): #updated for size of balloon
                     x, y, w, h = cv2.boundingRect(contour)
                     currentGreenx1 = x
                     currentGreenx2 = x+w
+                    print("GREEN")
                     self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
                     
                     # pass results to another function
@@ -387,11 +384,13 @@ class BalloonPopper():
         
 
             # Program Termination
-            cv2.imshow("Multiple Color Detection in Real-TIme", imageFrame)
-            if cv2.waitKey(10) & 0xFF == ord('q'):
-                cap.release()
-                cv2.destroyAllWindows()
-                break
+            # cv2.imshow("Multiple Color Detection in Real-Time", imageFrame)
+            # if cv2.waitKey(10) & 0xFF == ord('q'):
+            #     print("GOT3")
+            #     cap.release()
+            #     cv2.destroyAllWindows()
+            #     break
+
 
     def isCentered(self,x1,x2,width):
         print("checking is centered")
