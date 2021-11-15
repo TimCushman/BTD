@@ -36,7 +36,7 @@ LINEAR_VELOCITY = 0.1 # m/s
 ANGULAR_VELOCITY = math.pi/16 # rad/s
 
 # Threshold of minimum clearance distance (feel free to tune)
-MIN_THRESHOLD_DISTANCE = .25 # m, threshold distance, should be smaller than range_max
+MIN_THRESHOLD_DISTANCE = .4 # m, threshold distance, should be smaller than range_max
 
 # Field of view in radians that is checked in front of the robot (feel free to tune)
 MIN_SCAN_ANGLE_RAD = -30.0 / 180 * math.pi
@@ -128,17 +128,17 @@ class BalloonPopper():
                    
             
     def image_callback(self, img_msg):
-        #if self._fsm != fsm.GREEN_BALLOON and self._fsm != fsm.TURN:
-        rospy.loginfo(img_msg.header)
-        #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
-        
-        img_arr = np.fromstring(img_msg.data, np.uint8)
-        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-        self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        
-        #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
-        
-        self.determineBalloonColor()
+        if self._fsm != fsm.TURN:
+            rospy.loginfo(img_msg.header)
+            #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
+            
+            img_arr = np.fromstring(img_msg.data, np.uint8)
+            img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+            self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            
+            #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
+            
+            self.determineBalloonColor()
 
 
     # from pa0
@@ -158,7 +158,9 @@ class BalloonPopper():
     
     def rotate_rel(self,angle):
         # Rate at which to operate the while loop.
-        self.stop()
+        if self._fsm != fsm.RANDOM_WALK:
+            print("HERE")
+            self.stop()
         rate = rospy.Rate(FREQUENCY)
     
 
@@ -198,7 +200,7 @@ class BalloonPopper():
                 # find a random angle between (-pi,pi)
 
                 # new_angle = random.uniform(-math.pi/2, math.pi/2)
-                new_angle = (120 / 180 * math.pi)
+                new_angle = (120.0 / 180.0 * math.pi)
 
                 # find the absolute value of the time to see how long the robot should rotate for 
                 # to reach the desired angle 
@@ -217,6 +219,7 @@ class BalloonPopper():
                     else: 
                         self.move(0, - self.angular_velocity)
                     if self.green == True:
+                        print("BREAK")
                         break
                 self.stop()
                 # reset _close_obstacle 
