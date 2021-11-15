@@ -10,6 +10,7 @@ import random # to find random angle
 import numpy as np
 import cv2
 from cv_bridge import CvBridge
+import time
 
 
 # import of relevant libraries.
@@ -134,7 +135,7 @@ class BalloonPopper():
                    
             
     def image_callback(self, img_msg):
-        if self._fsm != fsm.TURN :
+        if self._fsm != fsm.TURN:
             rospy.loginfo(img_msg.header)
             #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
             
@@ -369,6 +370,7 @@ class BalloonPopper():
                 #print("SEES GREEN IN AREA Function")
                 self.green = True
                 print("GREEN")
+                print(time.time())
                 rospy.sleep(1)
                 self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
                 
@@ -387,19 +389,19 @@ class BalloonPopper():
         centerXHighRange = centerX + buffer
 
         rotation_angle = abs(float(centerX-centerBoxX))/float(width)*(math.pi/3)
-        #print(centerBoxX,"center box")
+        print(centerBoxX,"center box")
         
         # print(rotation_angle, "angle of rotation to get to center")
 
         if(centerBoxX <= centerXHighRange and centerBoxX >= centerXLowRange) or self.min_range < .5:
-            #print("Centered") #uncomment for easier testing of centering
+            print("Centered") #uncomment for easier testing of centering
             #return 1 #centered
             self.center = True
             self._fsm = fsm.GREEN_BALLOON
         else:
             
             if(centerBoxX < centerXLowRange):
-                #print("tooLeft") #uncomment for easier testing of centering
+                print("tooLeft") #uncomment for easier testing of centering
                 #return 2 #object too far left, turn towards the left
                 self.center = False
                 self.rotate_rel(rotation_angle, "green")
@@ -408,7 +410,7 @@ class BalloonPopper():
 
 
             else:
-                #print("tooRight") #uncomment for easier testing of centering
+                print("tooRight") #uncomment for easier testing of centering
                 #return 3 #object too far right, turn towards the right
                 self.center = False
                 self.rotate_rel(-rotation_angle, "green")
