@@ -36,7 +36,7 @@ LINEAR_VELOCITY = 0.1 # m/s
 ANGULAR_VELOCITY = math.pi/16 # rad/s
 
 # Threshold of minimum clearance distance (feel free to tune)
-MIN_THRESHOLD_DISTANCE = 1.0 # m, threshold distance, should be smaller than range_max
+MIN_THRESHOLD_DISTANCE = .25 # m, threshold distance, should be smaller than range_max
 
 # Field of view in radians that is checked in front of the robot (feel free to tune)
 MIN_SCAN_ANGLE_RAD = -30.0 / 180 * math.pi
@@ -123,7 +123,7 @@ class BalloonPopper():
                    
             
     def image_callback(self, img_msg):
-        if self._fsm != fsm.GREEN_BALLOON:
+        if self._fsm != fsm.GREEN_BALLOON and self._fsm != fsm.TURN:
             rospy.loginfo(img_msg.header)
             #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
           
@@ -154,6 +154,7 @@ class BalloonPopper():
     def rotate_rel(self,angle):
         # Rate at which to operate the while loop.
         rate = rospy.Rate(FREQUENCY)
+        print("is in rotate")
 
         start_time = rospy.get_rostime()
         
@@ -179,14 +180,9 @@ class BalloonPopper():
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
             # break out of loop if a green/red balloon is sensed
-            if self.green or self.red: 
-                break
-
+            
             if not self._close_obstacle:  
                 self.move(LINEAR_VELOCITY, 0)
-                
-                if self.green or self.red: 
-                    break
 
             else: 
                 # stop the robots motion 
@@ -214,7 +210,10 @@ class BalloonPopper():
 
                 self.stop()
                 # reset _close_obstacle 
-                self._close_obstacle = False              
+                self._close_obstacle = False    
+
+            if self.green or self.red: 
+                return          
 
             rate.sleep()
 
@@ -241,14 +240,18 @@ class BalloonPopper():
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
-            print(self._fsm)
+
+            
             if self._fsm == fsm.RANDOM_WALK:
                 self.random_walk()
 
+            print(self._fsm)
             if self._fsm == fsm.TURN:
+                print("turning")
                 self.rotate_rel(math.pi)
                 # set state back to random walk after turning 
-                #self.red = False
+                self.red = False
+                self.green = False
                 rospy.sleep(2)
                 self._fsm == fsm.RANDOM_WALK
 
@@ -337,8 +340,7 @@ class BalloonPopper():
                 print("RED")  
                 self.red = True 
                 self._fsm = fsm.TURN
-            else: 
-                self.red = False
+                
     
         # Creating contour to track green color
         _,contours, hierarchy = cv2.findContours(green_mask,
@@ -354,8 +356,6 @@ class BalloonPopper():
                 self.green = True
                 self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
                 
-            else: 
-                self.green = False
 
 
 
