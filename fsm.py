@@ -69,7 +69,7 @@ class BalloonPopper():
 
 
         # image subscriber 
-        self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback)
+        self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback, queue_size=1)
         #self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, Image, self.image_callback, queue_size=1)
     
         self.image = None
@@ -124,11 +124,11 @@ class BalloonPopper():
 
         #if self._fsm == fsm.GREEN_BALLOON:
         if self.min_range < self.min_threshold_distance: 
-            print("too close to wall")
+            #print("too close to wall")
             self._close_obstacle = True
 
         if self.min_range < self.pop_thresh_dist:
-            print("too close too balloon")
+            #print("too close too balloon")
             self._pop_close_obstacle = True 
 
                    
@@ -266,13 +266,13 @@ class BalloonPopper():
 
 
             if self._fsm == fsm.GREEN_BALLOON:
-                print("Pop Green")
+                #print("Pop Green")
                 # go forward, lidar should stop the robot 
                 if not self._pop_close_obstacle: 
                     self.move(self.linear_velocity, 0)
                 else: 
                     self.green = False
-                    print("changing state")
+                    #print("changing state")
                     self._fsm = fsm.TURN
                     
 
@@ -387,19 +387,19 @@ class BalloonPopper():
         centerXHighRange = centerX + buffer
 
         rotation_angle = abs(float(centerX-centerBoxX))/float(width)*(math.pi/3)
-        print(centerBoxX,"center box")
+        #print(centerBoxX,"center box")
         
         # print(rotation_angle, "angle of rotation to get to center")
 
         if(centerBoxX <= centerXHighRange and centerBoxX >= centerXLowRange) or self.min_range < .5:
-            print("Centered") #uncomment for easier testing of centering
+            #print("Centered") #uncomment for easier testing of centering
             #return 1 #centered
             self.center = True
             self._fsm = fsm.GREEN_BALLOON
         else:
             
             if(centerBoxX < centerXLowRange):
-                print("tooLeft") #uncomment for easier testing of centering
+                #print("tooLeft") #uncomment for easier testing of centering
                 #return 2 #object too far left, turn towards the left
                 self.center = False
                 self.rotate_rel(rotation_angle, "green")
@@ -408,7 +408,7 @@ class BalloonPopper():
 
 
             else:
-                print("tooRight") #uncomment for easier testing of centering
+                #print("tooRight") #uncomment for easier testing of centering
                 #return 3 #object too far right, turn towards the right
                 self.center = False
                 self.rotate_rel(-rotation_angle, "green")
