@@ -32,8 +32,8 @@ DEFAULT_IMAGE_TOPIC = "/camera/rgb/image_raw/compressed"
 FREQUENCY = 3 #Hz.
 
 # Velocities that will be used (feel free to tune)
-LINEAR_VELOCITY = 0.3 # m/s
-ANGULAR_VELOCITY = math.pi/10 # rad/s
+LINEAR_VELOCITY = 0.1 # m/s
+ANGULAR_VELOCITY = math.pi/16 # rad/s
 
 # Threshold of minimum clearance distance (feel free to tune)
 MIN_THRESHOLD_DISTANCE = 1.0 # m, threshold distance, should be smaller than range_max
@@ -51,10 +51,7 @@ class fsm(Enum):
     RANDOM_WALK = 1
     GREEN_BALLOON = 2
     TURN = 3
-    RETRY = 4
-    TURN_RIGHT = 5
-    TURN_LEFT = 6
-    STOP = 7
+    STOP = 4
 
 
 # implement fsm 
@@ -68,12 +65,13 @@ class BalloonPopper():
         self._cmd_pub = rospy.Publisher(DEFAULT_CMD_VEL_TOPIC, Twist, queue_size=1)
         # Setting up subscriber receiving messages from the laser.
         
-        #self._laser_sub = rospy.Subscriber(DEFAULT_SCAN_TOPIC, LaserScan, self._laser_callback, queue_size=1)
+        self._laser_sub = rospy.Subscriber(DEFAULT_SCAN_TOPIC, LaserScan, self._laser_callback, queue_size=1)
 
 
         # image subscriber 
         self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback)
         #self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, Image, self.image_callback, queue_size=1)
+        print("main")
         self.image = None
 
         self.bridge = CvBridge()
@@ -83,10 +81,7 @@ class BalloonPopper():
         self.min_threshold_distance = min_threshold_distance
         self.scan_angle = scan_angle
 
-
-        self.curr_linear_vel = self.linear_velocity
-        
-        self._fsm = fsm.STOP
+        self._fsm = fsm.RANDOM_WALK
 
         # Flag used to control the behavior of the robot.
         self._close_obstacle = False # Flag variable that is true if there is a close obstacle.
@@ -100,36 +95,45 @@ class BalloonPopper():
         self.left = False
         self.right = False
 
+        self.pop_dist = .5
+
     def _laser_callback(self, msg):
         # TODO: laser callback function (some of this might have to go in camera callback?)
         # deal with fsm states 
 
         # robot will only be random walking when green flag and red flag are false, thus only needs to run this loop when 
         # in the process of random walking 
-        if not self._close_obstacle and not self.green and not self.red:
-            min_index = int((self.scan_angle[0] - msg.angle_min) / msg.angle_increment)
-            max_index = int((self.scan_angle[1] - msg.angle_min) / msg.angle_increment)
+        min_index = int((self.scan_angle[0] - msg.angle_min) / msg.angle_increment)
+        max_index = int((self.scan_angle[1] - msg.angle_min) / msg.angle_increment)
 
-            # only look at the range values within the scan angle and find the minimum 
-            range_values = msg.ranges[min_index:max_index + 1]
+        # only look at the range values within the scan angle and find the minimum 
+        range_values = msg.ranges[min_index:max_index + 1]
 
-            # If the minimum range value is closer to min_threshold_distance, change the flag self._close_obstacle
-            min_range = min(range_values)
+        # If the minimum range value is closer to min_threshold_distance, change the flag self._close_obstacle
+        min_range = min(range_values)
+
+        if not self._close_obstacle and self._fsm == fsm.RANDOM_WALK:
             if min_range < self.min_threshold_distance:
                 self._close_obstacle = True 
+
+        if self._fsm == fsm.GREEN_BALLOON:
+            if min_range < self.pop_dist:
+                self._close_obstacle = True 
+
+                   
             
     def image_callback(self, img_msg):
-        
-        rospy.loginfo(img_msg.header)
-        #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
-        print("incallback")
-        img_arr = np.fromstring(img_msg.data, np.uint8)
-        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-        self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        
-        #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
-        
-        self.determineBalloonColor()
+        if self._fsm != fsm.GREEN_BALLOON:
+            rospy.loginfo(img_msg.header)
+            #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
+            print("incallback")
+            img_arr = np.fromstring(img_msg.data, np.uint8)
+            img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+            self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            
+            #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
+            
+            self.determineBalloonColor()
 
 
     # from pa0
@@ -156,12 +160,12 @@ class BalloonPopper():
         while not rospy.is_shutdown():
             #print("turning")
             # Check if done.
-            duration = abs(angle/self.angular_vel)
+            duration = abs(angle/self.angular_velocity)
             if rospy.get_rostime() - start_time <= rospy.Duration(duration):
                 if angle < 0: 
-                    self.move(0, - self.angular_vel)
+                    self.move(0, - self.angular_velocity)
                 else: 
-                    self.move(0, self.angular_vel)
+                    self.move(0, self.angular_velocity)
             else:
                 break 
             
@@ -234,47 +238,23 @@ class BalloonPopper():
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
-            print(self._fsm)
-        #     if self._fsm == fsm.RANDOM_WALK:
-        #         # call random walk
-        #         if self.green: 
-        #             self._fsm = fsm.GREEN_BALLOON
+            if self._fsm == fsm.RANDOM_WALK:
+                print("random walk")
+                self.random_walk()
 
-        #         if self.red:
-        #             self._fsm = fsm.TURN
-        #         else:
-        #             # do random walk 
-        #             self.random_walk()
-
-        #     if self._fsm == fsm.TURN:
-        #         self.rotate_rel(math.pi)
-        #         # set state back to random walk after turning 
-        #         self.red = False
-        #         self._fsm == fsm.RandomWalk
-                
-
-            if self.green == True:
-                self._fsm = fsm.GREEN_BALLOON
+            if self._fsm == fsm.TURN:
+                self.rotate_rel(math.pi)
+                # set state back to random walk after turning 
+                self.red = False
+                self._fsm == fsm.RandomWalk
 
             if self._fsm == fsm.GREEN_BALLOON:
-                # accelerate the robot, remember to reset the velovity after popping
-                if self.center:
-                    # for now just move a little forward and then stop and continue random walk 
-                    #self.curr_linear_vel = self.linear_velocity*1.5
-                    #self.move(self.curr_linear_vel,0)
-                    #self.translate(.3)
-                    #self.green = False 
-                    #self._fsm = fsm.TURN
-                    self._fsm == fsm.STOP
-                    
+                # go forward, lidar should stop the robot 
+                if not self._close_obstacle: 
+                    self.move(self.linear_velocity, 0)
+                else: 
+                    self._fsm = fsm.TURN
 
-                if self.left:
-                    self.move(0,self.angular_velocity)
-                if self.right:
-                    self.move(0, -self.angular_velocity)
-
-            if self._fsm == fsm.STOP:
-                self.move(0,0)
 
             rate.sleep()
    
@@ -287,7 +267,7 @@ class BalloonPopper():
 
     # Start a while loop
     def determineBalloonColor(self):
-        #print("determining color")
+        print("determining color")
         # Capturing video through webcam
         #webcam = cv2.VideoCapture(0)
         imageFrame = self.image
@@ -297,15 +277,6 @@ class BalloonPopper():
         
         #screenheight = imageFrame.shape[0] #height doesn't matter - delete if no longer needed
         screenwidth = imageFrame.shape[1]
-        #print(screenwidth,"WIDTH") #should be 640 
-        #channels = imageFrame.shape[2] #can delete don't think channels are important - Tim 
-    #while(1)
-        # Reading the video from the
-        # webcam in image frames
-        #_, imageFrame = webcam.read()
-
-        # height, width, number of channels in image
-
         
         # Convert the imageFrame in 
         # BGR(RGB color space) to 
@@ -358,18 +329,10 @@ class BalloonPopper():
                 x, y, w, h = cv2.boundingRect(contour)
                 currentRedx1 = x
                 currentRedx2 = x+w
-                #result = self.isCentered(currentRedx1,currentRedx2,screenwidth)
-                # pass results to another function
-                
-                imageFrame = cv2.rectangle(imageFrame, (x, y), 
-                                        (x + w, y + h), 
-                                        (0, 0, 255), 2) 
-                
-                cv2.putText(imageFrame, "Red Color", (x, y),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                            (0, 0, 255))  
+ 
                 print("RED")  
                 self.red = True 
+                self._fsm = fsm.GREEN_BALLOON
             else: 
                 self.red = False
     
@@ -387,29 +350,15 @@ class BalloonPopper():
                 self.green = True
                 self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
                 
-                # pass results to another function
-
-                imageFrame = cv2.rectangle(imageFrame, (x, y), 
-                                        (x + w, y + h),
-                                        (0, 255, 0), 2)
-                
-                cv2.putText(imageFrame, "Green Color", (x, y),
-                            cv2.FONT_HERSHEY_SIMPLEX, 
-                            1.0, (0, 255, 0))
             else: 
                 self.green = False
 
-        # Program Termination
-        # cv2.imshow("Multiple Color Detection in Real-Time", imageFrame)
-        # if cv2.waitKey(10) & 0xFF == ord('q'):
-        #     print("GOT3")
-        #     cap.release()
-        #     cv2.destroyAllWindows()
-        #     break
+
 
 
     def isCentered(self,x1,x2,width):
-        buffer = 15 #set to help give a range to be within the center
+        print("checking is centered")
+        buffer = 20 #set to help give a range to be within the center
         centerX = width/2
         centerBoxX = x1 + ((x2-x1)/2)
 
@@ -420,26 +369,30 @@ class BalloonPopper():
         # print(centerBoxX,'BW')
         # print(centerXLowRange,"LOW")
         # print(centerXHighRange,"HIG")
+        rotation_angle = abs(float(centerX-centerBoxX))/float(width)*(math.pi/3)
+        # print("WIDTH: " + str(width))
+        # print("DIFF: " + str(centerX-centerBoxX))
 
         if(centerBoxX < centerXHighRange and centerBoxX > centerXLowRange):
             print("Centered") #uncomment for easier testing of centering
             #return 1 #centered
             self.center = True
-            self.right = False
-            self.left = False
+            self._fsm = fsm.GREEN_BALLOON
         else:
             if(centerBoxX < centerXLowRange):
                 print("tooLeft") #uncomment for easier testing of centering
                 #return 2 #object too far left, turn towards the left
                 self.center = False
-                self.right = False
-                self.left = True
+                self.rotate_rel(rotation_angle)
+                rospy.sleep(2)
+
             else:
                 print("tooRight") #uncomment for easier testing of centering
                 #return 3 #object too far right, turn towards the right
                 self.center = False
-                self.right = True
-                self.left = False
+                self.rotate_rel(-rotation_angle)
+                rospy.sleep(2)
+
 
 
 
