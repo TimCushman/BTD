@@ -184,6 +184,9 @@ class BalloonPopper():
 
             if not self._close_obstacle:  
                 self.move(LINEAR_VELOCITY, 0)
+                
+                if self.green or self.red: 
+                    break
 
             else: 
                 # stop the robots motion 
@@ -235,18 +238,19 @@ class BalloonPopper():
 
 
     def pop(self):
-        print(self._fsm)
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
+            print(self._fsm)
             if self._fsm == fsm.RANDOM_WALK:
                 self.random_walk()
 
             if self._fsm == fsm.TURN:
                 self.rotate_rel(math.pi)
                 # set state back to random walk after turning 
-                self.red = False
-                self._fsm == fsm.RandomWalk
+                #self.red = False
+                rospy.sleep(2)
+                self._fsm == fsm.RANDOM_WALK
 
             if self._fsm == fsm.GREEN_BALLOON:
                 # go forward, lidar should stop the robot 
@@ -254,6 +258,7 @@ class BalloonPopper():
                     self.move(self.linear_velocity, 0)
                 else: 
                     self._fsm = fsm.TURN
+                    
 
 
             rate.sleep()
@@ -289,8 +294,8 @@ class BalloonPopper():
         # red_lower = np.array([5, 50, 50], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
         # red_upper = np.array([15, 255, 255], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
 
-        red_lower = np.array([136, 87, 111], np.uint8)
-        red_upper = np.array([180, 255, 255], np.uint8)
+        red_lower = np.array([0,50,20], np.uint8)
+        red_upper = np.array([5,255,255], np.uint8)
         red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
     
         # Set range for green color and 
@@ -369,8 +374,7 @@ class BalloonPopper():
         # print(centerXLowRange,"LOW")
         # print(centerXHighRange,"HIG")
         rotation_angle = abs(float(centerX-centerBoxX))/float(width)*(math.pi/3)
-        # print("WIDTH: " + str(width))
-        # print("DIFF: " + str(centerX-centerBoxX))
+        print(rotation_angle)
 
         if(centerBoxX < centerXHighRange and centerBoxX > centerXLowRange):
             print("Centered") #uncomment for easier testing of centering
@@ -384,6 +388,8 @@ class BalloonPopper():
                 self.center = False
                 self.rotate_rel(rotation_angle)
                 rospy.sleep(2)
+                self._fsm = fsm.GREEN_BALLOON
+
 
             else:
                 print("tooRight") #uncomment for easier testing of centering
@@ -391,6 +397,7 @@ class BalloonPopper():
                 self.center = False
                 self.rotate_rel(-rotation_angle)
                 rospy.sleep(2)
+                self._fsm = fsm.GREEN_BALLOON
 
 
 
