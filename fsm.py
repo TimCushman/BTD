@@ -36,7 +36,7 @@ LINEAR_VELOCITY = 0.1 # m/s
 ANGULAR_VELOCITY = math.pi/16 # rad/s
 
 # Threshold of minimum clearance distance (feel free to tune)
-MIN_THRESHOLD_DISTANCE = .4 # m, threshold distance, should be smaller than range_max
+MIN_THRESHOLD_DISTANCE = .25 # m, threshold distance, should be smaller than range_max
 
 # Field of view in radians that is checked in front of the robot (feel free to tune)
 MIN_SCAN_ANGLE_RAD = -30.0 / 180 * math.pi
@@ -85,6 +85,7 @@ class BalloonPopper():
 
         # Flag used to control the behavior of the robot.
         self._close_obstacle = False # Flag variable that is true if there is a close obstacle.
+        self._pop_close_obstacle = False
 
         self.red = False
         self.green = False
@@ -94,8 +95,9 @@ class BalloonPopper():
         self.center = False
         self.left = False
         self.right = False
-
-        self.pop_dist = .25
+        self.min_range = 100
+        self.pop_dist = .5
+        self.pop_thresh_dist = .15
 
     def _laser_callback(self, msg):
         # TODO: laser callback function (some of this might have to go in camera callback?)
@@ -114,31 +116,35 @@ class BalloonPopper():
        # range_values = msg.ranges[min_index:max_index + 1]
 
         # If the minimum range value is closer to min_threshold_distance, change the flag self._close_obstacle
-        min_range = min(range_values)
+        self.min_range = min(range_values)
 
         # if not self._close_obstacle and self._fsm == fsm.RANDOM_WALK:
         #     if min_range < self.min_threshold_distance:
         #         self._close_obstacle = True 
 
         #if self._fsm == fsm.GREEN_BALLOON:
-        if min_range < self.pop_dist:
-            print("too close")
-            self._close_obstacle = True 
+        if self.min_range < self.min_threshold_distance: 
+            print("too close to wall")
+            self._close_obstacle = True
+
+        if self.min_range < self.pop_thresh_dist:
+            print("too close too balloon")
+            self._pop_close_obstacle = True 
 
                    
             
     def image_callback(self, img_msg):
-        if self._fsm != fsm.TURN:
-            rospy.loginfo(img_msg.header)
-            #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
-            
-            img_arr = np.fromstring(img_msg.data, np.uint8)
-            img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-            self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            
-            #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
-            
-            self.determineBalloonColor()
+        # if self._fsm != fsm.TURN:
+        rospy.loginfo(img_msg.header)
+        #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
+        
+        img_arr = np.fromstring(img_msg.data, np.uint8)
+        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+        self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        
+        #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
+        
+        self.determineBalloonColor()
 
 
     # from pa0
@@ -158,9 +164,9 @@ class BalloonPopper():
     
     def rotate_rel(self,angle):
         # Rate at which to operate the while loop.
-        if self._fsm != fsm.RANDOM_WALK:
-            print("HERE")
-            self.stop()
+        # if self._fsm != fsm.RANDOM_WALK:
+        #     print("HERE")
+        #     self.stop()
         rate = rospy.Rate(FREQUENCY)
     
 
@@ -172,6 +178,10 @@ class BalloonPopper():
             # Check if done.
             duration = abs(angle/self.angular_velocity)
             if rospy.get_rostime() - start_time <= rospy.Duration(duration):
+                # exit out of turning 
+
+                if self.green and self._fsm == fsm.RANDOM_WALK:
+                    return 
                 if angle < 0: 
                     self.move(0, - self.angular_velocity)
                 else: 
@@ -196,32 +206,33 @@ class BalloonPopper():
             else: 
                 # stop the robots motion
                 self.stop()
+                self.rotate_rel(120.0 / 180.0 * math.pi)
 
-                # find a random angle between (-pi,pi)
+                # # find a random angle between (-pi,pi)
 
-                # new_angle = random.uniform(-math.pi/2, math.pi/2)
-                new_angle = (120.0 / 180.0 * math.pi)
+                # # new_angle = random.uniform(-math.pi/2, math.pi/2)
+                # new_angle = (120.0 / 180.0 * math.pi)
 
-                # find the absolute value of the time to see how long the robot should rotate for 
-                # to reach the desired angle 
-                time = abs(new_angle/self.angular_velocity)
+                # # find the absolute value of the time to see how long the robot should rotate for 
+                # # to reach the desired angle 
+                # time = abs(new_angle/self.angular_velocity)
                 
-                # adapted from lec03_example_go_forward.py 
-                start_time = rospy.get_rostime()
+                # # adapted from lec03_example_go_forward.py 
+                # start_time = rospy.get_rostime()
 
-                while True: 
-                    if rospy.get_rostime() - start_time >= rospy.Duration(time):
-                        break          
-                    # if the random angle is negative, rotate counterclockwise 
-                    if new_angle <= 0: 
-                        self.move(0, self.angular_velocity)
-                    # if the angle is positive rotate clockwise 
-                    else: 
-                        self.move(0, - self.angular_velocity)
-                    if self.green == True:
-                        print("BREAK")
-                        break
-                self.stop()
+                # while True: 
+                #     if rospy.get_rostime() - start_time >= rospy.Duration(time):
+                #         break          
+                #     # if the random angle is negative, rotate counterclockwise 
+                #     if new_angle <= 0: 
+                #         self.move(0, self.angular_velocity)
+                #     # if the angle is positive rotate clockwise 
+                #     else: 
+                #         self.move(0, - self.angular_velocity)
+                #     if self.green == True:
+                #         print("BREAK")
+                #         break
+                # self.stop()
                 # reset _close_obstacle 
                 self._close_obstacle = False    
 
@@ -271,7 +282,7 @@ class BalloonPopper():
             if self._fsm == fsm.GREEN_BALLOON:
                 print("Pop Green")
                 # go forward, lidar should stop the robot 
-                if not self._close_obstacle: 
+                if not self._pop_close_obstacle: 
                     self.move(self.linear_velocity, 0)
                 else: 
                     self._fsm = fsm.TURN
@@ -385,18 +396,18 @@ class BalloonPopper():
         centerXHighRange = centerX + buffer
 
         rotation_angle = abs(float(centerX-centerBoxX))/float(width)*(math.pi/3)
-
+        print(centerBoxX,"center box")
         
         # print(rotation_angle, "angle of rotation to get to center")
 
-        if(centerBoxX < centerXHighRange and centerBoxX > centerXLowRange):
+        if(centerBoxX <= centerXHighRange and centerBoxX >= centerXLowRange) or self.min_range < .5:
             print("Centered") #uncomment for easier testing of centering
             #return 1 #centered
             self.center = True
             self._fsm = fsm.GREEN_BALLOON
         else:
             
-            if(centerBoxX <= centerXLowRange):
+            if(centerBoxX < centerXLowRange):
                 print("tooLeft") #uncomment for easier testing of centering
                 #return 2 #object too far left, turn towards the left
                 self.center = False
