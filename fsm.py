@@ -96,7 +96,7 @@ class BalloonPopper():
         self.left = False
         self.right = False
         self.min_range = 100
-        self.pop_dist = .5
+        self.pop_dist = .25
         self.pop_thresh_dist = .15
 
     def _laser_callback(self, msg):
@@ -134,17 +134,17 @@ class BalloonPopper():
                    
             
     def image_callback(self, img_msg):
-        # if self._fsm != fsm.TURN:
-        rospy.loginfo(img_msg.header)
-        #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
-        
-        img_arr = np.fromstring(img_msg.data, np.uint8)
-        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-        self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        
-        #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
-        
-        self.determineBalloonColor()
+        if self._fsm != fsm.TURN :
+            rospy.loginfo(img_msg.header)
+            #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
+            
+            img_arr = np.fromstring(img_msg.data, np.uint8)
+            img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+            self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            
+            #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
+            
+            self.determineBalloonColor()
 
 
     # from pa0
@@ -162,7 +162,7 @@ class BalloonPopper():
         twist_msg = Twist()
         self._cmd_pub.publish(twist_msg)
     
-    def rotate_rel(self,angle):
+    def rotate_rel(self,angle, method):
         # Rate at which to operate the while loop.
         # if self._fsm != fsm.RANDOM_WALK:
         #     print("HERE")
@@ -180,7 +180,8 @@ class BalloonPopper():
             if rospy.get_rostime() - start_time <= rospy.Duration(duration):
                 # exit out of turning 
 
-                if self.green and self._fsm == fsm.RANDOM_WALK:
+                if self.green and method == "random_walk":
+                    self.stop()
                     return 
                 if angle < 0: 
                     self.move(0, - self.angular_velocity)
@@ -192,54 +193,39 @@ class BalloonPopper():
             # Sleep to keep the set frequency.
             rate.sleep()
     
-        rospy.sleep(1)
+        #rospy.sleep(1)
 
     # code adapted from pa0
     def random_walk(self):
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
-            # break out of loop if a green/red balloon is sensed
-            
-            if not self._close_obstacle:  
-                self.move(LINEAR_VELOCITY, 0)
+            # break out of loop if a green balloon is sensed
+            self.rotate_rel(60.0 / 180.0 * math.pi, "random_walk")
 
+            if self.green or self.red:
+                return  
+
+            if not self._close_obstacle:  
+                dist = random.random()
+                self.translate(dist)
+
+            if self.green or self.red:
+                return  
             else: 
                 # stop the robots motion
                 self.stop()
-                self.rotate_rel(120.0 / 180.0 * math.pi)
+                self.rotate_rel(120.0 / 180.0 * math.pi,"random_walk")
 
-                # # find a random angle between (-pi,pi)
+                self._close_obstacle = False
 
-                # # new_angle = random.uniform(-math.pi/2, math.pi/2)
-                # new_angle = (120.0 / 180.0 * math.pi)
-
-                # # find the absolute value of the time to see how long the robot should rotate for 
-                # # to reach the desired angle 
-                # time = abs(new_angle/self.angular_velocity)
-                
-                # # adapted from lec03_example_go_forward.py 
-                # start_time = rospy.get_rostime()
-
-                # while True: 
-                #     if rospy.get_rostime() - start_time >= rospy.Duration(time):
-                #         break          
-                #     # if the random angle is negative, rotate counterclockwise 
-                #     if new_angle <= 0: 
-                #         self.move(0, self.angular_velocity)
-                #     # if the angle is positive rotate clockwise 
-                #     else: 
-                #         self.move(0, - self.angular_velocity)
-                #     if self.green == True:
-                #         print("BREAK")
-                #         break
-                # self.stop()
-                # reset _close_obstacle 
-                self._close_obstacle = False    
 
             if self.green or self.red:
-                return          
+                return  
+                    
 
             rate.sleep()
+
+        rospy.sleep(1)
 
     def translate(self, d):
         # Rate at which to operate the while loop.
@@ -270,12 +256,12 @@ class BalloonPopper():
                 self.random_walk()
 
             if self._fsm == fsm.TURN:
-                self.rotate_rel(math.pi/3)
+                self.rotate_rel(math.pi/3, "turn")
 
                 # set state back to random walk after turning 
                 self.red = False
                 self.green = False
-                rospy.sleep(2)
+                rospy.sleep(1)
                 self._fsm = fsm.RANDOM_WALK
 
 
@@ -285,6 +271,8 @@ class BalloonPopper():
                 if not self._pop_close_obstacle: 
                     self.move(self.linear_velocity, 0)
                 else: 
+                    self.green = False
+                    print("changing state")
                     self._fsm = fsm.TURN
                     
 
@@ -381,8 +369,11 @@ class BalloonPopper():
                 #print("SEES GREEN IN AREA Function")
                 self.green = True
                 print("GREEN")
+                rospy.sleep(1)
                 self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
                 
+            else: 
+                self.green = False
 
 
 
@@ -411,8 +402,8 @@ class BalloonPopper():
                 print("tooLeft") #uncomment for easier testing of centering
                 #return 2 #object too far left, turn towards the left
                 self.center = False
-                self.rotate_rel(rotation_angle)
-                #rospy.sleep(2)
+                self.rotate_rel(rotation_angle, "green")
+                #rospy.sleep(1)
                 self._fsm = fsm.GREEN_BALLOON
 
 
@@ -420,8 +411,8 @@ class BalloonPopper():
                 print("tooRight") #uncomment for easier testing of centering
                 #return 3 #object too far right, turn towards the right
                 self.center = False
-                self.rotate_rel(-rotation_angle)
-                #rospy.sleep(2)
+                self.rotate_rel(-rotation_angle, "green")
+                #rospy.sleep(1)
                 self._fsm = fsm.GREEN_BALLOON
 
 
