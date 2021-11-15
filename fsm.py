@@ -71,7 +71,7 @@ class BalloonPopper():
         # image subscriber 
         self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, CompressedImage, self.image_callback)
         #self._img_sub = rospy.Subscriber(DEFAULT_IMAGE_TOPIC, Image, self.image_callback, queue_size=1)
-        print("main")
+    
         self.image = None
 
         self.bridge = CvBridge()
@@ -112,13 +112,13 @@ class BalloonPopper():
         # If the minimum range value is closer to min_threshold_distance, change the flag self._close_obstacle
         min_range = min(range_values)
 
-        if not self._close_obstacle and self._fsm == fsm.RANDOM_WALK:
-            if min_range < self.min_threshold_distance:
-                self._close_obstacle = True 
+        # if not self._close_obstacle and self._fsm == fsm.RANDOM_WALK:
+        #     if min_range < self.min_threshold_distance:
+        #         self._close_obstacle = True 
 
-        if self._fsm == fsm.GREEN_BALLOON:
-            if min_range < self.pop_dist:
-                self._close_obstacle = True 
+        #if self._fsm == fsm.GREEN_BALLOON:
+        if min_range < self.pop_dist:
+            self._close_obstacle = True 
 
                    
             
@@ -126,7 +126,7 @@ class BalloonPopper():
         if self._fsm != fsm.GREEN_BALLOON:
             rospy.loginfo(img_msg.header)
             #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
-            print("incallback")
+          
             img_arr = np.fromstring(img_msg.data, np.uint8)
             img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
             self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -235,11 +235,11 @@ class BalloonPopper():
 
 
     def pop(self):
+        print(self._fsm)
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
             if self._fsm == fsm.RANDOM_WALK:
-                print("random walk")
                 self.random_walk()
 
             if self._fsm == fsm.TURN:
@@ -267,7 +267,6 @@ class BalloonPopper():
 
     # Start a while loop
     def determineBalloonColor(self):
-        print("determining color")
         # Capturing video through webcam
         #webcam = cv2.VideoCapture(0)
         imageFrame = self.image
@@ -332,7 +331,7 @@ class BalloonPopper():
  
                 print("RED")  
                 self.red = True 
-                self._fsm = fsm.GREEN_BALLOON
+                self._fsm = fsm.TURN
             else: 
                 self.red = False
     
