@@ -95,7 +95,7 @@ class BalloonPopper():
         self.left = False
         self.right = False
 
-        self.pop_dist = .5
+        self.pop_dist = .25
 
     def _laser_callback(self, msg):
         # TODO: laser callback function (some of this might have to go in camera callback?)
@@ -106,8 +106,12 @@ class BalloonPopper():
         min_index = int((self.scan_angle[0] - msg.angle_min) / msg.angle_increment)
         max_index = int((self.scan_angle[1] - msg.angle_min) / msg.angle_increment)
 
+        min_index_left = msg.ranges[0:30]
+        min_index_right = msg.ranges[-30:]
+        range_values = min_index_left + min_index_right
+
         # only look at the range values within the scan angle and find the minimum 
-        range_values = msg.ranges[min_index:max_index + 1]
+       # range_values = msg.ranges[min_index:max_index + 1]
 
         # If the minimum range value is closer to min_threshold_distance, change the flag self._close_obstacle
         min_range = min(range_values)
@@ -118,22 +122,23 @@ class BalloonPopper():
 
         #if self._fsm == fsm.GREEN_BALLOON:
         if min_range < self.pop_dist:
+            print("too close")
             self._close_obstacle = True 
 
                    
             
     def image_callback(self, img_msg):
-        if self._fsm != fsm.GREEN_BALLOON and self._fsm != fsm.TURN:
-            rospy.loginfo(img_msg.header)
-            #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
-          
-            img_arr = np.fromstring(img_msg.data, np.uint8)
-            img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-            self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            
-            #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
-            
-            self.determineBalloonColor()
+        #if self._fsm != fsm.GREEN_BALLOON and self._fsm != fsm.TURN:
+        rospy.loginfo(img_msg.header)
+        #self.image = self.br.imgmsg_to_cv2(img_msg,desired_encoding='8UC3')
+        
+        img_arr = np.fromstring(img_msg.data, np.uint8)
+        img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+        self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        
+        #self.image = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding='bgr8')
+        
+        self.determineBalloonColor()
 
 
     # from pa0
@@ -153,13 +158,15 @@ class BalloonPopper():
     
     def rotate_rel(self,angle):
         # Rate at which to operate the while loop.
+        self.stop()
         rate = rospy.Rate(FREQUENCY)
-        print("is in rotate")
+    
 
         start_time = rospy.get_rostime()
         
         while not rospy.is_shutdown():
-            #print("turning")
+
+
             # Check if done.
             duration = abs(angle/self.angular_velocity)
             if rospy.get_rostime() - start_time <= rospy.Duration(duration):
@@ -185,11 +192,13 @@ class BalloonPopper():
                 self.move(LINEAR_VELOCITY, 0)
 
             else: 
-                # stop the robots motion 
+                # stop the robots motion
                 self.stop()
 
                 # find a random angle between (-pi,pi)
-                new_angle = random.uniform(- math.pi, math.pi)
+
+                # new_angle = random.uniform(-math.pi/2, math.pi/2)
+                new_angle = (120 / 180 * math.pi)
 
                 # find the absolute value of the time to see how long the robot should rotate for 
                 # to reach the desired angle 
@@ -207,12 +216,13 @@ class BalloonPopper():
                     # if the angle is positive rotate clockwise 
                     else: 
                         self.move(0, - self.angular_velocity)
-
+                    if self.green == True:
+                        break
                 self.stop()
                 # reset _close_obstacle 
                 self._close_obstacle = False    
 
-            if self.green or self.red: 
+            if self.green or self.red:
                 return          
 
             rate.sleep()
@@ -225,7 +235,7 @@ class BalloonPopper():
             # Check if done.
             
             duration = rospy.Duration(abs(d/self.linear_velocity))
-            #print(duration)
+
             
             if rospy.get_rostime() - start_time <= duration:
                 self.move(self.linear_velocity, 0)
@@ -245,17 +255,18 @@ class BalloonPopper():
             if self._fsm == fsm.RANDOM_WALK:
                 self.random_walk()
 
-            print(self._fsm)
             if self._fsm == fsm.TURN:
-                print("turning")
-                self.rotate_rel(math.pi)
+                self.rotate_rel(math.pi/3)
+
                 # set state back to random walk after turning 
                 self.red = False
                 self.green = False
                 rospy.sleep(2)
-                self._fsm == fsm.RANDOM_WALK
+                self._fsm = fsm.RANDOM_WALK
+
 
             if self._fsm == fsm.GREEN_BALLOON:
+                print("Pop Green")
                 # go forward, lidar should stop the robot 
                 if not self._close_obstacle: 
                     self.move(self.linear_velocity, 0)
@@ -278,7 +289,6 @@ class BalloonPopper():
         # Capturing video through webcam
         #webcam = cv2.VideoCapture(0)
         imageFrame = self.image
-        #print(imageFrame)
         #_, imageFrame = webcam.read()
         dimensions = imageFrame.shape
         
@@ -294,11 +304,12 @@ class BalloonPopper():
         # Set range for red color and 
         # define mask
 
-        # red_lower = np.array([5, 50, 50], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
-        # red_upper = np.array([15, 255, 255], np.uint8) #USE TO TEST ON ORANGE COLORS - WILL STILL MARK AS RED
+        # red_lower = np.array([136, 87, 111], np.uint8) #RED
+        # red_upper = np.array([180, 255, 255], np.uint8)  #RED 
 
-        red_lower = np.array([0,50,20], np.uint8)
-        red_upper = np.array([5,255,255], np.uint8)
+        red_lower = np.array([94, 80, 2], np.uint8) #marks as red but checks for blue 
+        red_upper = np.array([120, 255, 255], np.uint8) #marks as red but checks for blue
+        
         red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
     
         # Set range for green color and 
@@ -330,16 +341,17 @@ class BalloonPopper():
         _, contours, hierarchy = cv2.findContours(red_mask,
                                             cv2.RETR_TREE,
                                             cv2.CHAIN_APPROX_SIMPLE)
-        for pic, contour in enumerate(contours):
-            area = cv2.contourArea(contour)
-            if(area > 1000): #updated for size of balloon
-                x, y, w, h = cv2.boundingRect(contour)
-                currentRedx1 = x
-                currentRedx2 = x+w
+        # for pic, contour in enumerate(contours):
+        #     area = cv2.contourArea(contour)
+        #     if(area > 4000): #updated for size of balloon
+        #         x, y, w, h = cv2.boundingRect(contour)
+        #         currentRedx1 = x
+        #         currentRedx2 = x+w
  
-                print("RED")  
-                self.red = True 
-                self._fsm = fsm.TURN
+        #         #print("SEES RED in area function")  
+        #         self.red = True 
+        #         print("BLUE")
+        #         self._fsm = fsm.TURN
                 
     
         # Creating contour to track green color
@@ -348,12 +360,13 @@ class BalloonPopper():
                                             cv2.CHAIN_APPROX_SIMPLE)
         for pic, contour in enumerate(contours):
             area = cv2.contourArea(contour)
-            if(area > 1000): #updated for size of balloon
+            if(area > 4000): #updated for size of balloon
                 x, y, w, h = cv2.boundingRect(contour)
                 currentGreenx1 = x
                 currentGreenx2 = x+w
-                print("GREEN")
+                #print("SEES GREEN IN AREA Function")
                 self.green = True
+                print("GREEN")
                 self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
                 
 
@@ -361,7 +374,6 @@ class BalloonPopper():
 
 
     def isCentered(self,x1,x2,width):
-        print("checking is centered")
         buffer = 20 #set to help give a range to be within the center
         centerX = width/2
         centerBoxX = x1 + ((x2-x1)/2)
@@ -369,12 +381,10 @@ class BalloonPopper():
         centerXLowRange = centerX - buffer
         centerXHighRange = centerX + buffer
 
-        # Test print statements to help with centering
-        # print(centerBoxX,'BW')
-        # print(centerXLowRange,"LOW")
-        # print(centerXHighRange,"HIG")
         rotation_angle = abs(float(centerX-centerBoxX))/float(width)*(math.pi/3)
-        print(rotation_angle)
+
+        
+        # print(rotation_angle, "angle of rotation to get to center")
 
         if(centerBoxX < centerXHighRange and centerBoxX > centerXLowRange):
             print("Centered") #uncomment for easier testing of centering
@@ -382,12 +392,13 @@ class BalloonPopper():
             self.center = True
             self._fsm = fsm.GREEN_BALLOON
         else:
-            if(centerBoxX < centerXLowRange):
+            
+            if(centerBoxX <= centerXLowRange):
                 print("tooLeft") #uncomment for easier testing of centering
                 #return 2 #object too far left, turn towards the left
                 self.center = False
                 self.rotate_rel(rotation_angle)
-                rospy.sleep(2)
+                #rospy.sleep(2)
                 self._fsm = fsm.GREEN_BALLOON
 
 
@@ -396,9 +407,8 @@ class BalloonPopper():
                 #return 3 #object too far right, turn towards the right
                 self.center = False
                 self.rotate_rel(-rotation_angle)
-                rospy.sleep(2)
+                #rospy.sleep(2)
                 self._fsm = fsm.GREEN_BALLOON
-
 
 
 
