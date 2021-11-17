@@ -110,16 +110,17 @@ class BalloonPopper():
         # If the minimum range value is closer to min_threshold_distance, change the flag self._close_obstacle
         min_range = min(range_values)
 
-        if self._fsm != fsm.GREEN_BALLOON: #
+        if self._fsm != fsm.GREEN_BALLOON:
             if min_range < self.min_threshold_distance:
                 print("too close, will turn")
+                self.stop()
                 self._close_obstacle = True 
         else: #if in green balloon state allow it to get closer so it can pop the balloon but if too close enter too close state
             if min_range < self.min_threshold_distance_in_pop_state:
-                print("too close to balloon/wall")
+                self.stop()
+                print("too close to balloon/wall, will turn")
                 self._close_obstacle = True 
                     
-            
     def image_callback(self, img_msg):
             rospy.loginfo(img_msg.header)
             
@@ -164,30 +165,27 @@ class BalloonPopper():
             
             # Sleep to keep the set frequency.
             rate.sleep()
-    
+
     # code adapted from pa0
     def random_walk(self):
         rate = rospy.Rate(FREQUENCY)
         while not rospy.is_shutdown():
-            # break out of loop if a green/red balloon is sensed
+            # break out of loop if a green/red balloon is sensed 
+                # stop the robots motion
+            self.stop()
+           
+            #turn 180 degrees
+            new_angle = (120.0 / 180.0 * math.pi)
+
+            if self.green != True and self.red != True:
+                self.rotate_rel(new_angle)
             
             if not self._close_obstacle: 
-                # ranDist = random.random #THIS MAY BE BETTER
-                randDist = random.uniform(.2-1.2) 
+                randDist = random.uniform(.2,1.2) 
                 self.translate(randDist,"forwards")
-
-            else: 
-                # stop the robots motion
+            if self._close_obstacle:
                 self.stop()
-                
-                self.translate(.1,"backwards") #get some room from the wall ****THIS MAY CAUSE AN INFINITE LOOP****
-
-                #turn 60 degrees
-                new_angle = (120.0 / 180.0 * math.pi)
-                while True:
-                    self.rotate_rel(new_angle)
-                    if self.green == True:
-                        break
+                self.translate(.2,"backwards")
 
     def translate(self, d, direction):
         # Rate at which to operate the while loop.
@@ -240,13 +238,6 @@ class BalloonPopper():
                     self._fsm = fsm.TURN
             
             rate.sleep()
-   
-   
-    def go(self):
-        self.pop()
-        rospy.spin()
-
-
 
     def determineBalloonColor(self):
         imageFrame = self.image
@@ -258,8 +249,14 @@ class BalloonPopper():
         hsvFrame = cv2.cvtColor(imageFrame, cv2.COLOR_BGR2HSV)
     
         # Set range for red color and define mask
-        red_lower = np.array([136, 87, 111], np.uint8) #RED
-        red_upper = np.array([180, 255, 255], np.uint8)  #RED 
+        red_lower = np.array([136, 87, 111], np.uint8) #RED OLD
+        red_upper = np.array([180, 255, 255], np.uint8)  #RED OLD
+
+        # red_lower = np.array([0, 50, 20], np.uint8) #RED 2
+        # red_upper = np.array([5, 255, 255], np.uint8)  #RED 2
+
+        # red_lower = np.array([175, 50,20], np.uint8) #RED 3
+        # red_upper = np.array([180, 255, 255], np.uint8)  #RED 3
         red_mask = cv2.inRange(hsvFrame, red_lower, red_upper)
     
         # Set range for green color and define mask
@@ -278,7 +275,9 @@ class BalloonPopper():
         green_mask = cv2.dilate(green_mask, kernal)
 
         # Creating contour to track red color
-        _, contours, hierarchy = cv2.findContours(red_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours, hierarchy = cv2.findContours(red_mask,
+                                                cv2.RETR_TREE, 
+                                                cv2.CHAIN_APPROX_SIMPLE)
         
         for pic, contour in enumerate(contours):
             area = cv2.contourArea(contour)
@@ -304,7 +303,7 @@ class BalloonPopper():
                 self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
                 
     def isCentered(self,x1,x2,width):
-        buffer = 20 #set to help give a range to be within the center
+        buffer = 25 #set to help give a range to be within the center
         centerX = width/2
         centerBoxX = x1 + ((x2-x1)/2)
 
@@ -328,6 +327,10 @@ class BalloonPopper():
                 self.center = False
                 self.rotate_rel(-rotation_angle)
                 self._fsm = fsm.GREEN_BALLOON
+
+    def go(self):
+        self.pop()
+        rospy.spin()
 
 
 
