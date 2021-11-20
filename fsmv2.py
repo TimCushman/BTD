@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #The line above is important so that this file is interpreted with Python when running it.
 
-# Authors: Tim Cushman and Anna Manning, Ben Lehrburger and Jack Gnibus 
+# Authors: Timothy Cushman, Anna Manning, Ben Lehrburger and Jack Gnibus 
 # Date: November 2021
 
 # Import of python modules.
