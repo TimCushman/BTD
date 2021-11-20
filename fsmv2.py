@@ -30,12 +30,12 @@ DEFAULT_IMAGE_TOPIC = "/camera/rgb/image_raw/compressed"
 FREQUENCY = 3 #Hz.
 
 # Velocities that will be used (feel free to tune)
-LINEAR_VELOCITY = 0.04 # m/s
+LINEAR_VELOCITY = 0.1 # m/s
 ANGULAR_VELOCITY = math.pi/8 # rad/s
 
 # Threshold of minimum clearance distance (feel free to tune)
 MIN_THRESHOLD_DISTANCE = .25 # m, threshold distance, should be smaller than range_max
-MIN_THRESHOLD_DISTANCE_IN_POP_STATE = .2 # Field of view in radians that is checked in front of the robot (feel free to tune)
+MIN_THRESHOLD_DISTANCE_IN_POP_STATE = .05 # Field of view in radians that is checked in front of the robot (feel free to tune)
 MIN_SCAN_ANGLE_RAD = -30.0 / 180 * math.pi
 MAX_SCAN_ANGLE_RAD = +30.0 / 180 * math.pi
 
@@ -114,13 +114,19 @@ class BalloonPopper():
 
         else: #if in green balloon state allow it to get closer so it can pop the balloon but if too close enter too close state
             if min_range < self.min_threshold_distance_in_pop_state:
-                self.translate(.09,"forward")
                 self.stop()
                 print("too close to balloon/wall, will turn")
+                print(self._fsm,"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSTTTTTTTTTTATE")
+                print(self._fsm,"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSTTTTTTTTTTATE")
+                print(self._fsm,"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSTTTTTTTTTTATE")
+                print(self._fsm,"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSTTTTTTTTTTATE")
+                print(self._fsm,"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSTTTTTTTTTTATE")
+                print(self._fsm,"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSTTTTTTTTTTATE")
+                print(self._fsm,"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSTTTTTTTTTTATE")
+                print(self._fsm,"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSTTTTTTTTTTATE")
+                # self.rotate_rel(math.pi, "balloon")
                 self._fsm = fsm.TURN
-                # self._close_obstacle = True
-
-        print(min_range)
+                #self._close_obstacle = True
                       
     def image_callback(self, img_msg):
             rospy.loginfo(img_msg.header)
@@ -234,35 +240,34 @@ class BalloonPopper():
 
     def pop(self):
         # TODO
-        rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
+        rate = rospy.Rate(10) # loop at 10 Hz.
         while not rospy.is_shutdown():
 
-            if self._fsm == fsm.RANDOM_WALK:
-                self.random_walk()
+                if self._fsm == fsm.RANDOM_WALK:
+                    self.random_walk()
 
-            # go backwards and turn 60 degrees in the TURN state
-            if self._fsm == fsm.TURN:
-                self.stop()
-                rospy.sleep(1)
-                self.translate(.1,"backwards")
-                self.rotate_rel(math.pi/3)
-                # set state back to random walk after turning, reset color flags  
-                self.red = False
-                self.green = False
-                rospy.sleep(1)
-                self._fsm = fsm.RANDOM_WALK
-
-            if self._fsm == fsm.GREEN_BALLOON:
-                # go forward, lidar should stop the robot 
-                if not self._close_obstacle: 
-                    self.move(self.linear_velocity, 0)
-                else: 
-                    print("HERE I AM SAYS THE MAN")
+                # go backwards and turn 60 degrees in the TURN state
+                if self._fsm == fsm.TURN:
                     self.stop()
-                    self._fsm = fsm.TURN
+                    rospy.sleep(1)
+                    self.translate(.1,"backwards")
+                    self.rotate_rel(math.pi/3)
+                    # set state back to random walk after turning, reset color flags  
+                    self.red = False
+                    self.green = False
+                    rospy.sleep(1)
+                    self._fsm = fsm.RANDOM_WALK
 
-            
-            rate.sleep()
+                if self._fsm == fsm.GREEN_BALLOON:
+                    # go forward, lidar should stop the robot 
+                    if not self._close_obstacle:   
+                        self.move(self.linear_velocity, 0)
+                    else: 
+                        self.stop()
+                        self._fsm = fsm.TURN
+
+                
+                rate.sleep()
 
     def determineBalloonColor(self):
         imageFrame = self.image
@@ -311,6 +316,10 @@ class BalloonPopper():
                 print("Green Balloon Detected")
                 # this will set the fsm to GREEN_BALLOON
                 self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
+            else: 
+                #CHANGED 
+                self.green = False
+                self._fsm = fsm.RANDOM_WALK
                 
         # Creating contour to track red color
         _, contours, hierarchy = cv2.findContours(red_mask,
@@ -324,8 +333,29 @@ class BalloonPopper():
                 if(self.green != True):
                     self.red = True 
                     print("Red Balloon Detected")
+                    print("Red Balloon Detected")
+                    print("Red Balloon Detected")
+                    print("Red Balloon Detected")
+                    print("Red Balloon Detected")
+                    print("Red Balloon Detected")
+                    print("Red Balloon Detected")
+                    print("Red Balloon Detected")
+                    print("Red Balloon Detected")
+                    print("Red Balloon Detected")
+                    print("Red Balloon Detected")
                     self.stop()
-                    self._fsm = fsm.TURN
+                    self.rotate_rel(math.pi)
+                    print("ROTATEDDDDDDDD")
+                    print("ROTATEDDDDDDDD")
+                    print("ROTATEDDDDDDDD")
+                    print("ROTATEDDDDDDDD")
+                    print("ROTATEDDDDDDDD")
+                    print("ROTATEDDDDDDDD")
+                    print("ROTATEDDDDDDDD")
+                    print("ROTATEDDDDDDDD")
+                    print("ROTATEDDDDDDDD")
+                    self.red = False
+                    # self._fsm = fsm.TURN
    
    # makes sure that the balloon is centered in the image message from the robot
     def isCentered(self,x1,x2,width):
