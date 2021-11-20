@@ -304,6 +304,8 @@ class BalloonPopper():
         _,contours, hierarchy = cv2.findContours(green_mask,
                                             cv2.RETR_TREE,
                                             cv2.CHAIN_APPROX_SIMPLE)
+        self.green = False
+        self.red = False
         for pic, contour in enumerate(contours):
             area = cv2.contourArea(contour)
             if(area > 4000): #updated for size of balloon
@@ -316,10 +318,10 @@ class BalloonPopper():
                 print("Green Balloon Detected")
                 # this will set the fsm to GREEN_BALLOON
                 self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
-            else: 
-                #CHANGED 
-                self.green = False
-                self._fsm = fsm.RANDOM_WALK
+        
+        if not self.green: 
+            self._fsm = fsm.RANDOM_WALK
+
                 
         # Creating contour to track red color
         _, contours, hierarchy = cv2.findContours(red_mask,
@@ -344,7 +346,7 @@ class BalloonPopper():
                     print("Red Balloon Detected")
                     print("Red Balloon Detected")
                     self.stop()
-                    self.rotate_rel(math.pi)
+                    self.rotate_rel(math.pi/2)
                     print("ROTATEDDDDDDDD")
                     print("ROTATEDDDDDDDD")
                     print("ROTATEDDDDDDDD")
