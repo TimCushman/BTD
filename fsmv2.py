@@ -76,19 +76,19 @@ class BalloonPopper():
         self.min_threshold_distance = min_threshold_distance
         self.min_threshold_distance_in_pop_state = min_threshold_distance_in_pop_state 
 
+        # start off fsm in random walk state 
         self._fsm = fsm.RANDOM_WALK
 
         # Flag used to control the behavior of the robot.
         self._close_obstacle = False # Flag variable that is true if there is a close obstacle.
 
+        # flags for state 
         self.red = False
         self.green = False
         self.popped = False
 
         # to check if the green baloon is in the center of the frame
         self.center = False
-        self.left = False
-        self.right = False
 
     def _laser_callback(self, msg):
         # TODO: laser callback function (some of this might have to go in camera callback?)
@@ -115,7 +115,7 @@ class BalloonPopper():
 
         else: #if in green balloon state allow it to get closer so it can pop the balloon but if too close enter too close state
             if min_range < self.min_threshold_distance_in_pop_state:
-                print("too close to balloon/FRHwall, will turn")
+                print("too close to balloon/wall, will turn")
                 self.stop()
                 self._close_obstacle = True
                       
@@ -124,7 +124,7 @@ class BalloonPopper():
             img_arr = np.fromstring(img_msg.data, np.uint8)
             img = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
             self.image = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-
+            # deal with imabe processing and FSM states 
             self.determineBalloonColor()
 
 
@@ -137,15 +137,18 @@ class BalloonPopper():
         twist_msg.linear.x = linear_vel
         twist_msg.angular.z = angular_vel
         self._cmd_pub.publish(twist_msg)
-
+    # from PA0
     def stop(self):
         """Stop the robot."""
         twist_msg = Twist()
         self._cmd_pub.publish(twist_msg)
     
+    # adapted from pa4
     def rotate_rel(self,angle):
-        if self._fsm != fsm.RANDOM_WALK:
+        # stop rotating if it sees a green balloon 
+        if self._fsm == fsm.GREEN_BALLOON:
             self.stop()
+
         rate = rospy.Rate(FREQUENCY)
 
         start_time = rospy.get_rostime()
@@ -216,25 +219,27 @@ class BalloonPopper():
             rate.sleep()
  
 
-
+    # adapted from pa4
     def translate(self, d, direction):
         # Rate at which to operate the while loop.
         rate = rospy.Rate(FREQUENCY)
         start_time = rospy.get_rostime()
-        direct = direction #forwards or backwards
-        if(direct == "backwards"):
+        #direct = direction #forwards or backwards
+        if(direction == "backwards"):
             linearVel = -self.linear_velocity
         else:
             linearVel = self.linear_velocity
 
         while not rospy.is_shutdown():
             # Check if done.
-            
-            duration = rospy.Duration(abs(d/self.linear_velocity))
+            if not self._close_obstacle and linear_vel < 0:
+                duration = rospy.Duration(abs(d/self.linear_velocity))
 
-            if rospy.get_rostime() - start_time <= duration:
-                self.move(linearVel, 0)
-            else:
+                if rospy.get_rostime() - start_time <= duration:
+                    self.move(linearVel, 0)
+                else:
+                    break 
+            else: 
                 break 
             
             # Sleep to keep the set frequency.
@@ -245,27 +250,29 @@ class BalloonPopper():
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
-            if self._close_obstacle:
-                print("AM I HERE???")
-                self.stop()
-                self.translate(.1,"backwards")
-                self.rotate_rel(120.0 / 180.0 * math.pi)
-                self._close_obstacle = False
-                self._fsm = fsm.RANDOM_WALK
+            
+            # if self._close_obstacle:
+            #     print("AM I HERE???")
+            #     self.stop()
+            #     self.translate(.1,"backwards")
+            #     self.rotate_rel(120.0 / 180.0 * math.pi)
+            #     self._close_obstacle = False
+            #     self._fsm = fsm.RANDOM_WALK
 
             if self._fsm == fsm.RANDOM_WALK:
                 self.random_walk()
 
+            # go backwards and turn 60 degrees in the TURN state
             if self._fsm == fsm.TURN:
                 self.stop()
+                rospy.sleep(1)
+                self.translate(.1,"backwards")
                 self.rotate_rel(math.pi/3)
-
-                # set state back to random walk after turning 
+                # set state back to random walk after turning, reset color flags  
                 self.red = False
                 self.green = False
-                rospy.sleep(2)
+                rospy.sleep(1)
                 self._fsm = fsm.RANDOM_WALK
-
 
             if self._fsm == fsm.GREEN_BALLOON:
                 # go forward, lidar should stop the robot 
@@ -339,7 +346,7 @@ class BalloonPopper():
                     self.red = True 
                     print("Red Balloon Detected")
                     self.stop()
-                    self.translate(.4,"backwards")
+                    #self.translate(.1,"backwards")
                     self._fsm = fsm.TURN
    
    # makes sure that the balloon is centered in the image message from the robot
