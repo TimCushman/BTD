@@ -75,7 +75,6 @@ class BalloonPopper():
         self.angular_velocity = angular_velocity # Constant angular velocity set.
         self.min_threshold_distance = min_threshold_distance
         self.min_threshold_distance_in_pop_state = min_threshold_distance_in_pop_state 
-        self.scan_angle = scan_angle
 
         self._fsm = fsm.RANDOM_WALK
 
@@ -97,8 +96,8 @@ class BalloonPopper():
 
         # robot will only be random walking when green flag and red flag are false, thus only needs to run this loop when 
         # in the process of random walking 
-        min_index = int((self.scan_angle[0] - msg.angle_min) / msg.angle_increment)
-        max_index = int((self.scan_angle[1] - msg.angle_min) / msg.angle_increment)
+        # min_index = int((self.scan_angle[0] - msg.angle_min) / msg.angle_increment)
+        # max_index = int((self.scan_angle[1] - msg.angle_min) / msg.angle_increment)
 
         # only look at the range values within the field of view and find the minimum 
         min_index_left = msg.ranges[0:30]
@@ -108,19 +107,18 @@ class BalloonPopper():
         # If the minimum range value is closer to min_threshold_distance, change the flag self._close_obstacle
         min_range = min(range_values)
 
-        if self._fsm != fsm.GREEN_BALLOON:
+        if not self.green:
             if min_range < self.min_threshold_distance:
                 print("too close, will turn")
                 self.stop()
                 self._close_obstacle = True 
-                self._fsm = fsm.TURN
+
         else: #if in green balloon state allow it to get closer so it can pop the balloon but if too close enter too close state
             if min_range < self.min_threshold_distance_in_pop_state:
-                self.stop()
                 print("too close to balloon/FRHwall, will turn")
+                self.stop()
                 self._close_obstacle = True
-                self._fsm = fsm.TURN 
-                    
+                      
     def image_callback(self, img_msg):
             rospy.loginfo(img_msg.header)
             img_arr = np.fromstring(img_msg.data, np.uint8)
@@ -169,26 +167,54 @@ class BalloonPopper():
     def random_walk(self):
         rate = rospy.Rate(FREQUENCY)
         while not rospy.is_shutdown():
-            # break out of loop if a green/red balloon is sensed 
-                # stop the robots motion
-            self.stop()
+            # # break out of loop if a green/red balloon is sensed 
+            #     # stop the robots motion
+            # self.stop()
+            
+            # if not self._close_obstacle: 
+            #     randDist = random.uniform(.2,.5) 
+            #     self.translate(randDist,"forwards")
+        
+            # elif self._close_obstacle:
+            #     print("I WANNA GO HOME")
+            #     self.stop()
+            #     self.translate(.1,"backwards")
+            #     self.rotate_rel(new_angle)
+            #     self._close_obstacle = False
+            
+            # #turn 180 degrees
+            # new_angle = (120.0 / 180.0 * math.pi)
+
+            # if self.green != True and self.red != True:
+            #     self.rotate_rel(new_angle)
+
+             # Keep looping until user presses Ctrl+C
+            
+            # If the flag self._close_obstacle is False, the robot should move forward.
+            # Otherwise, the robot should rotate for a random amount of time
+            # after which the flag is set again to False.
+            # Use the function move already implemented, passing the default velocities saved in the corresponding class members.
+
+            ####### TODO: ANSWER CODE BEGIN #######
+            if (self._close_obstacle == False): # If the flag is set to false, we are not near a wall and will walk forwards at the speed of the linear velocity 
+                self.move(self.linear_velocity, 0)
+            else:
+                randomAngle = random.uniform(-math.pi,math.pi) # Get a random angle between -pi and pi 
+                timeToRun = abs(randomAngle)/ANGULAR_VELOCITY # This line gives us the time needed to turn the correct angle amount
+                start_time = rospy.get_rostime() # Start a time
+                while True:                      
+                    if(randomAngle < 0): # If the angle is less than zero, turn clockwise
+                        self.move(0, self.angular_velocity)
+                    else:
+                        self.move(0, -self.angular_velocity) # If the random angle is greater than zero, turn counter clockwise
+                    self._close_obstacle = False # After moving, set the flag to false because we can now move forwards without running into a wall
+                    
+                    # Once the runtime is greater than or equal to the time needed to turn the correct angle amount, we break out of the while loop 
+                    if rospy.get_rostime() - start_time >= rospy.Duration(timeToRun): 
+                        break      
            
-            #turn 180 degrees
-            new_angle = (120.0 / 180.0 * math.pi)
-
-            if self.green != True and self.red != True:
-                self.rotate_rel(new_angle)
-
-            if not self._close_obstacle: 
-                randDist = random.uniform(.2,.5) 
-                self.translate(randDist,"forwards")
-
-            if self._close_obstacle:
-                print("I WANNA GO HOME")
-                self.stop()
-                self.translate(.1,"backwards")
-                self.rotate_rel(new_angle)
-                self._close_obstacle = False
+            rate.sleep()
+ 
 
 
     def translate(self, d, direction):
@@ -219,7 +245,14 @@ class BalloonPopper():
         # TODO
         rate = rospy.Rate(FREQUENCY) # loop at 10 Hz.
         while not rospy.is_shutdown():
-            
+            if self._close_obstacle:
+                print("AM I HERE???")
+                self.stop()
+                self.translate(.1,"backwards")
+                self.rotate_rel(120.0 / 180.0 * math.pi)
+                self._close_obstacle = False
+                self._fsm = fsm.RANDOM_WALK
+
             if self._fsm == fsm.RANDOM_WALK:
                 self.random_walk()
 
@@ -242,12 +275,6 @@ class BalloonPopper():
                     print("HERE I AM SAYS THE MAN")
                     self._fsm = fsm.TURN
 
-            if self._close_obstacle:
-                print("AM I HERE???")
-                self.stop()
-                self.translate(.1,"backwards")
-                self.rotate_rel(120.0 / 180.0 * math.pi)
-                self._close_obstacle = False
             
             rate.sleep()
 
@@ -280,8 +307,7 @@ class BalloonPopper():
 
         # For green color
         green_mask = cv2.dilate(green_mask, kernal)
-
-                
+  
     
         # Creating contour to track green color
         _,contours, hierarchy = cv2.findContours(green_mask,
@@ -290,11 +316,14 @@ class BalloonPopper():
         for pic, contour in enumerate(contours):
             area = cv2.contourArea(contour)
             if(area > 4000): #updated for size of balloon
+                # get x value and width of box so that we can tell if the robot
+                # is centered
                 x, y, w, h = cv2.boundingRect(contour)
                 currentGreenx1 = x
                 currentGreenx2 = x+w
                 self.green = True
                 print("Green Balloon Detected")
+                # this will set the fsm to GREEN_BALLOON
                 self.isCentered(currentGreenx1,currentGreenx2,screenwidth)
                 
         # Creating contour to track red color
@@ -313,30 +342,32 @@ class BalloonPopper():
                     self.translate(.4,"backwards")
                     self._fsm = fsm.TURN
    
-   
+   # makes sure that the balloon is centered in the image message from the robot
     def isCentered(self,x1,x2,width):
         buffer = 25 #set to help give a range to be within the center
         centerX = width/2
         centerBoxX = x1 + ((x2-x1)/2)
-
+        # find the x values of the center of the imag frame 
         centerXLowRange = centerX - buffer
-        centerXHighRange = centerX + buffer
-
-        rotation_angle = abs(float(centerX-centerBoxX))/float(width)*(math.pi/3) #calc how far we need to turn to get centered
+        centerXHighRange = centerX + buffer        
 
         if(centerBoxX < centerXHighRange and centerBoxX > centerXLowRange):
             print("Centered")
             self.center = True
             self._fsm = fsm.GREEN_BALLOON
         else:
+            # calculate what angle th robot has to turn to make the balloon in the center of the image
+            rotation_angle = abs(float(centerX-centerBoxX))/float(width)*(math.pi/3) 
             if(centerBoxX <= centerXLowRange):
                 print("balloon too Left") 
                 self.center = False
+                # positive angle to turn left 
                 self.rotate_rel(rotation_angle)
                 self._fsm = fsm.GREEN_BALLOON
             else:
                 print("balloon too Right")
                 self.center = False
+                # negative angle to turn right 
                 self.rotate_rel(-rotation_angle)
                 self._fsm = fsm.GREEN_BALLOON
 
