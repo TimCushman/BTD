@@ -3,7 +3,7 @@
 ### Anna Manning, Tim Cushman, Ben Lehrburger and Jack Gnibus
 This program will cause the robot to avoid red objects and go towards green objects (in our test cases balloons)
 
-[To view our demo videp, click here!](https://github.com/TimCushman/BTD/blob/e420ff081cc216d16fb200c976b91b082324892b/BTDvideo.mp4)
+[To view our demo video, download here!](https://github.com/TimCushman/BTD/blob/e420ff081cc216d16fb200c976b91b082324892b/BTDvideo.mp4)
 
 ## How to run `BTD.py` on the ROSbot 2.0 
 
