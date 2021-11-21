@@ -1,4 +1,4 @@
-#Author: Timothy Cushman '23
+#Author: Timothy, Anna, Jack and Ben
 #Date: 11/11/21
 #Class: CS81 - Final Project
 #Program: Color Sensing with check if object is centered in the screen
