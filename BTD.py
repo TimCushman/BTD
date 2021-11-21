@@ -371,8 +371,8 @@ def main():
 
     # Robot finds green balloons, and pops them, avoiding red ballons
     try:
-        
         balloon_popper.go()
+        
     except rospy.ROSInterruptException:
         rospy.logerr("ROS node interrupted.")
 
