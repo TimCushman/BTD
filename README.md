@@ -13,5 +13,6 @@ Connect to the robot via Ethernet connection:
 3. Use 'ssh' to connect to the robot: `ssh husarion@192.168.0.1` #Password: husarion
 4. In another terminal, run `docker-compose exec ros bash` and run `husarnet daemon`
 5. In another terminal, run `docker-compose exec ros bash` and use 'scp' to copy the code `BTD.py` to the robot: `scp -r BTD.py husarion@192.168.0.1:~/husarion_ws/src/`
-6. then run `python BTD.py`
+6. On the robot go to the directory with the file by running, 'cd /husarion_ws/src/'
+7. Then run `python BTD.py`
 
