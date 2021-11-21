@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #The line above is important so that this file is interpreted with Python when running it.
 
-# Authors: Timothy Cushman, Anna Manning, Ben Lehrburger and Jack Gnibus 
+# Authors: Tim Cushman, Anna Manning, Ben Lehrburger and Jack Gnibus 
 # Date: November 2021
 
 # Import of python modules.
@@ -211,7 +211,7 @@ class BalloonPopper():
                 if self._fsm == fsm.RANDOM_WALK:
                     self.random_walk()
 
-                # Go backwards and turn 60 degrees in the TURN state
+                # Turn 60 degrees in the TURN state
                 if self._fsm == fsm.TURN:
                     self.stop()
                     self.rotate_rel(math.pi/3)
